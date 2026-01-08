@@ -3,11 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Form Filler</title>
+    <title>Alma - Document Processing</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <h1>Document Form Filler - Phase 1 Placeholder</h1>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <img src="alma-logo.png" alt="Alma" class="logo">
+            <div class="header-text">Document Processing Portal</div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Hero Section -->
+            <div class="hero-section">
+                <h1 class="hero-title">Upload Your Immigration Documents</h1>
+                <p class="hero-subtitle">
+                    We'll automatically detect and process your passport and G-28 form to streamline your immigration journey.
+                </p>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="upload-section">
+                <!-- Drop Zone -->
+                <div id="dropZone" class="drop-zone">
+                    <div class="drop-zone-content">
+                        <svg class="upload-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <h3 class="drop-zone-title">Drag & drop your documents here</h3>
+                        <p class="drop-zone-text">or click to browse</p>
+                        <p class="drop-zone-hint">Supports PDF, JPEG, and PNG files (max 10MB each)</p>
+                        <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- Document Status Cards -->
+                <div class="document-cards">
+                    <!-- Passport Card -->
+                    <div id="passportCard" class="document-card" data-type="passport">
+                        <div class="card-header">
+                            <div class="card-icon">📄</div>
+                            <h3 class="card-title">Passport</h3>
+                            <div class="card-status" id="passportStatus">
+                                <span class="status-waiting">Waiting for upload</span>
+                            </div>
+                        </div>
+                        <div class="card-body" id="passportPreview">
+                            <div class="empty-state">
+                                <p>No file uploaded yet</p>
+                            </div>
+                        </div>
+                        <div class="card-actions" id="passportActions" style="display: none;">
+                            <button class="btn-remove" onclick="removeFile('passport')">Remove</button>
+                        </div>
+                    </div>
+
+                    <!-- G-28 Card -->
+                    <div id="g28Card" class="document-card" data-type="g28">
+                        <div class="card-header">
+                            <div class="card-icon">📋</div>
+                            <h3 class="card-title">G-28 Form</h3>
+                            <div class="card-status" id="g28Status">
+                                <span class="status-waiting">Waiting for upload</span>
+                            </div>
+                        </div>
+                        <div class="card-body" id="g28Preview">
+                            <div class="empty-state">
+                                <p>No file uploaded yet</p>
+                            </div>
+                        </div>
+                        <div class="card-actions" id="g28Actions" style="display: none;">
+                            <button class="btn-remove" onclick="removeFile('g28')">Remove</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Messages -->
+                <div id="errorContainer" class="error-container" style="display: none;">
+                    <div class="error-message">
+                        <span id="errorText"></span>
+                        <button class="error-close" onclick="clearError()">×</button>
+                    </div>
+                </div>
+
+                <!-- Process Button -->
+                <div class="action-section">
+                    <button id="processBtn" class="btn-process" disabled>
+                        Process Documents
+                    </button>
+                    <p class="action-hint">Both documents required to proceed</p>
+                </div>
+            </div>
+
+            <!-- Processing State -->
+            <div id="processingState" class="processing-state" style="display: none;">
+                <div class="spinner"></div>
+                <h3>Processing your documents...</h3>
+                <p>This may take a few moments</p>
+            </div>
+
+            <!-- Success State -->
+            <div id="successState" class="success-state" style="display: none;">
+                <div class="success-icon">✓</div>
+                <h3>Documents uploaded successfully!</h3>
+                <p>Your documents are ready for processing.</p>
+                <button class="btn-continue" onclick="proceedToExtraction()">Continue to Form Filling</button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2024 Alma. Immigration made simple.</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loadingText">Uploading...</p>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

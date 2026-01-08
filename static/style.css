@@ -1,1 +1,486 @@
-/* Placeholder CSS file for Phase 1 */
+/* Alma Brand Colors */
+:root {
+    --alma-teal: #4A7C7E;
+    --alma-teal-dark: #3A6C6E;
+    --alma-light-bg: #FAF8F3;
+    --alma-light-green: #D4E4DC;
+    --alma-success: #5CB85C;
+    --alma-error: #DC3545;
+    --alma-warning: #FFC107;
+    --alma-text: #2C3E50;
+    --alma-text-light: #6C757D;
+    --alma-border: #E0E0E0;
+    --alma-white: #FFFFFF;
+}
+
+/* Reset & Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--alma-light-bg);
+    color: var(--alma-text);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.header {
+    padding: 24px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--alma-border);
+    background: var(--alma-white);
+    margin: 0 -20px;
+    padding: 24px 20px;
+}
+
+.logo {
+    height: 32px;
+    width: auto;
+}
+
+.header-text {
+    color: var(--alma-text-light);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    padding: 48px 0;
+}
+
+/* Hero Section */
+.hero-section {
+    text-align: center;
+    margin-bottom: 48px;
+}
+
+.hero-title {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--alma-teal);
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+}
+
+.hero-subtitle {
+    font-size: 18px;
+    color: var(--alma-text-light);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* Upload Section */
+.upload-section {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Drop Zone */
+.drop-zone {
+    background: var(--alma-white);
+    border: 2px dashed var(--alma-border);
+    border-radius: 16px;
+    padding: 48px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 32px;
+}
+
+.drop-zone:hover {
+    border-color: var(--alma-teal);
+    background: var(--alma-light-green);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(74, 124, 126, 0.1);
+}
+
+.drop-zone.drag-over {
+    border-color: var(--alma-teal);
+    background: var(--alma-light-green);
+    border-style: solid;
+}
+
+.drop-zone-content {
+    pointer-events: none;
+}
+
+.upload-icon {
+    color: var(--alma-teal);
+    margin-bottom: 16px;
+}
+
+.drop-zone-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--alma-text);
+    margin-bottom: 8px;
+}
+
+.drop-zone-text {
+    color: var(--alma-text-light);
+    margin-bottom: 8px;
+}
+
+.drop-zone-hint {
+    font-size: 14px;
+    color: var(--alma-text-light);
+    opacity: 0.8;
+}
+
+/* Document Cards */
+.document-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.document-card {
+    background: var(--alma-white);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.document-card:hover {
+    box-shadow: 0 4px 16px rgba(74, 124, 126, 0.15);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    position: relative;
+}
+
+.card-icon {
+    font-size: 24px;
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--alma-text);
+    flex: 1;
+}
+
+.card-status {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-waiting {
+    color: var(--alma-text-light);
+}
+
+.status-uploading {
+    color: var(--alma-warning);
+}
+
+.status-success {
+    color: var(--alma-success);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-error {
+    color: var(--alma-error);
+}
+
+.card-body {
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--alma-light-bg);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.empty-state {
+    color: var(--alma-text-light);
+    font-size: 14px;
+}
+
+.file-preview {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 100px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.preview-filename {
+    font-size: 12px;
+    color: var(--alma-text);
+    font-weight: 500;
+    text-align: center;
+    word-break: break-all;
+}
+
+.preview-filesize {
+    font-size: 11px;
+    color: var(--alma-text-light);
+}
+
+.card-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-remove {
+    background: none;
+    border: 1px solid var(--alma-error);
+    color: var(--alma-error);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-remove:hover {
+    background: var(--alma-error);
+    color: white;
+}
+
+/* Error Container */
+.error-container {
+    margin-bottom: 24px;
+}
+
+.error-message {
+    background: #FFF3CD;
+    border: 1px solid #FFC107;
+    color: #856404;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.error-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #856404;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+/* Action Section */
+.action-section {
+    text-align: center;
+}
+
+.btn-process {
+    background: var(--alma-teal);
+    color: white;
+    border: none;
+    padding: 16px 48px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+}
+
+.btn-process:hover:not(:disabled) {
+    background: var(--alma-teal-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(74, 124, 126, 0.3);
+}
+
+.btn-process:disabled {
+    background: var(--alma-border);
+    color: var(--alma-text-light);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.action-hint {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--alma-text-light);
+}
+
+/* Processing State */
+.processing-state {
+    text-align: center;
+    padding: 48px;
+    background: var(--alma-white);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.processing-state h3 {
+    margin-top: 24px;
+    color: var(--alma-teal);
+}
+
+.processing-state p {
+    color: var(--alma-text-light);
+    margin-top: 8px;
+}
+
+/* Success State */
+.success-state {
+    text-align: center;
+    padding: 48px;
+    background: var(--alma-white);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.success-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--alma-success);
+    color: white;
+    font-size: 32px;
+    font-weight: bold;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.success-state h3 {
+    color: var(--alma-text);
+    margin-bottom: 8px;
+}
+
+.success-state p {
+    color: var(--alma-text-light);
+    margin-bottom: 24px;
+}
+
+.btn-continue {
+    background: var(--alma-teal);
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-continue:hover {
+    background: var(--alma-teal-dark);
+}
+
+/* Spinner */
+.spinner {
+    border: 3px solid var(--alma-light-green);
+    border-top-color: var(--alma-teal);
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-content {
+    background: var(--alma-white);
+    padding: 32px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.loading-content p {
+    margin-top: 16px;
+    color: var(--alma-text);
+}
+
+/* Footer */
+.footer {
+    padding: 24px 0;
+    text-align: center;
+    border-top: 1px solid var(--alma-border);
+    color: var(--alma-text-light);
+    font-size: 14px;
+    margin-top: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .document-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .hero-title {
+        font-size: 28px;
+    }
+    
+    .hero-subtitle {
+        font-size: 16px;
+    }
+    
+    .drop-zone {
+        padding: 32px 20px;
+    }
+    
+    .btn-process {
+        width: 100%;
+    }
+}
