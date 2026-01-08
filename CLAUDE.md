@@ -1,0 +1,3 @@
+- this is a very important project we need to impress those people bring your A game
+- this project is very important be very precise and a great engineer
+- we need to keeo everything in one place so people testing this project have an easy time building it and testing it to see if it works
