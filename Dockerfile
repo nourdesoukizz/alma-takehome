@@ -10,13 +10,22 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr-eng \
     # PDF processing
     poppler-utils \
-    # OpenCV dependencies
+    # Image processing
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    # Python build tools
+    python3-dev \
+    gcc \
+    g++ \
     # Network tools
     wget \
     curl \

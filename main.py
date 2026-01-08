@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 import os
 import uuid
 import shutil
@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
+from extractors.passport_extractor import PassportExtractor
 
 # Load environment variables
 load_dotenv()
@@ -213,6 +214,60 @@ async def process_documents(session_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+
+@app.post("/api/extract/passport/{session_id}")
+async def extract_passport_data(session_id: str):
+    """Extract data from uploaded passport"""
+    try:
+        session_dir = UPLOADS_DIR / session_id
+        
+        if not session_dir.exists():
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Find passport file
+        passport_file = None
+        for file_path in session_dir.glob("*"):
+            if "passport" in file_path.name.lower():
+                passport_file = file_path
+                break
+        
+        if not passport_file:
+            # Try to find any image/PDF file
+            for file_path in session_dir.glob("*"):
+                if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.pdf']:
+                    passport_file = file_path
+                    break
+        
+        if not passport_file:
+            raise HTTPException(status_code=404, detail="Passport file not found")
+        
+        # Extract data
+        extractor = PassportExtractor()
+        result = extractor.extract(str(passport_file))
+        
+        # Store extraction results in session
+        result['sessionId'] = session_id
+        result['filename'] = passport_file.name
+        
+        return JSONResponse(content=result)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {str(e)}")
+
+@app.get("/api/extract/passport/{session_id}")
+async def get_passport_extraction(session_id: str):
+    """Get previously extracted passport data"""
+    try:
+        # For now, re-extract on GET request
+        # In production, this would retrieve cached results
+        return await extract_passport_data(session_id)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get extraction: {str(e)}")
 
 # Mount static files (this should be last)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

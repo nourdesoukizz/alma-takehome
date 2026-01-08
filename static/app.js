@@ -344,10 +344,242 @@ document.getElementById('processBtn').addEventListener('click', async function()
 });
 
 // Proceed to extraction phase
-function proceedToExtraction() {
-    // This will be implemented in Phase 3
-    alert('Proceeding to document extraction... (Phase 3)');
-    // window.location.href = '/extraction';
+async function proceedToExtraction() {
+    console.log('Starting extraction process...');
+    
+    // Show loading
+    showLoading('Extracting passport data...');
+    
+    try {
+        // Get session from localStorage
+        const sessionData = JSON.parse(localStorage.getItem('uploadSession'));
+        console.log('Session data:', sessionData);
+        
+        if (!sessionData || !sessionData.sessionId) {
+            throw new Error('No upload session found. Please upload documents first.');
+        }
+        
+        // Call extraction API
+        console.log('Calling extraction API for session:', sessionData.sessionId);
+        const response = await fetch(`/api/extract/passport/${sessionData.sessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Extraction API error:', errorText);
+            throw new Error(`Extraction failed: ${response.status} - ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('Extraction result:', result);
+        
+        hideLoading();
+        
+        // Display extraction results
+        displayExtractionResults(result);
+        
+    } catch (error) {
+        console.error('Extraction error:', error);
+        hideLoading();
+        
+        // Show more detailed error message
+        const errorMsg = `
+            <div style="text-align: left;">
+                <strong>Extraction failed:</strong><br>
+                ${error.message}<br><br>
+                <small>Check browser console for details. Make sure Docker is running.</small>
+            </div>
+        `;
+        
+        // Display error in the UI
+        document.getElementById('successState').innerHTML = `
+            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 8px; color: #856404;">
+                ${errorMsg}
+                <br><br>
+                <button class="btn-continue" onclick="location.reload()">Try Again</button>
+            </div>
+        `;
+    }
+}
+
+// Display extraction results
+function displayExtractionResults(result) {
+    // Hide success state, show extraction results
+    document.getElementById('successState').style.display = 'none';
+    
+    // Create extraction results UI
+    const extractionHTML = `
+        <div class="extraction-results">
+            <h2 class="extraction-title">Passport Data Extracted</h2>
+            <p class="extraction-subtitle">
+                ${result.method === 'mrz' ? 'Data extracted from MRZ' : 'Data extracted using OCR'} 
+                (${Math.round(result.confidence * 100)}% confidence)
+            </p>
+            
+            <div class="extraction-data">
+                <div class="data-group">
+                    <h3>Personal Information</h3>
+                    <div class="data-field">
+                        <label>Full Name:</label>
+                        <input type="text" value="${result.data.full_name || ''}" id="fullName">
+                    </div>
+                    <div class="data-field">
+                        <label>Last Name:</label>
+                        <input type="text" value="${result.data.last_name || ''}" id="lastName">
+                    </div>
+                    <div class="data-field">
+                        <label>First Name:</label>
+                        <input type="text" value="${result.data.first_name || ''}" id="firstName">
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <h3>Document Details</h3>
+                    <div class="data-field">
+                        <label>Passport Number:</label>
+                        <input type="text" value="${result.data.passport_number || ''}" id="passportNumber">
+                    </div>
+                    <div class="data-field">
+                        <label>Nationality:</label>
+                        <input type="text" value="${result.data.nationality || ''}" id="nationality">
+                    </div>
+                    <div class="data-field">
+                        <label>Country Code:</label>
+                        <input type="text" value="${result.data.country_code || ''}" id="countryCode">
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <h3>Important Dates</h3>
+                    <div class="data-field">
+                        <label>Date of Birth:</label>
+                        <input type="date" value="${result.data.date_of_birth || ''}" id="dateOfBirth">
+                    </div>
+                    <div class="data-field">
+                        <label>Issue Date:</label>
+                        <input type="date" value="${result.data.issue_date || ''}" id="issueDate">
+                    </div>
+                    <div class="data-field">
+                        <label>Expiry Date:</label>
+                        <input type="date" value="${result.data.expiry_date || ''}" id="expiryDate">
+                    </div>
+                </div>
+                
+                <div class="data-group">
+                    <h3>Additional Info</h3>
+                    <div class="data-field">
+                        <label>Sex:</label>
+                        <select id="sex">
+                            <option value="">Select</option>
+                            <option value="M" ${result.data.sex === 'M' ? 'selected' : ''}>Male</option>
+                            <option value="F" ${result.data.sex === 'F' ? 'selected' : ''}>Female</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="extraction-actions">
+                <button class="btn-secondary" onclick="location.reload()">Upload Different Documents</button>
+                <button class="btn-primary" onclick="proceedToG28Extraction()">Continue to G-28 Extraction</button>
+            </div>
+        </div>
+    `;
+    
+    // Add styles if not already present
+    if (!document.querySelector('.extraction-styles')) {
+        const styles = document.createElement('style');
+        styles.className = 'extraction-styles';
+        styles.innerHTML = `
+            .extraction-results {
+                background: var(--alma-white);
+                border-radius: 16px;
+                padding: 32px;
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            .extraction-title {
+                color: var(--alma-teal);
+                margin-bottom: 8px;
+            }
+            .extraction-subtitle {
+                color: var(--alma-text-light);
+                margin-bottom: 32px;
+            }
+            .extraction-data {
+                display: grid;
+                gap: 32px;
+                margin-bottom: 32px;
+            }
+            .data-group {
+                padding: 20px;
+                background: var(--alma-light-bg);
+                border-radius: 8px;
+            }
+            .data-group h3 {
+                color: var(--alma-teal);
+                margin-bottom: 16px;
+                font-size: 16px;
+            }
+            .data-field {
+                display: grid;
+                grid-template-columns: 150px 1fr;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+            .data-field label {
+                font-weight: 500;
+                color: var(--alma-text);
+            }
+            .data-field input,
+            .data-field select {
+                padding: 8px 12px;
+                border: 1px solid var(--alma-border);
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            .extraction-actions {
+                display: flex;
+                gap: 16px;
+                justify-content: space-between;
+            }
+            .btn-secondary {
+                background: var(--alma-border);
+                color: var(--alma-text);
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            .btn-primary {
+                background: var(--alma-teal);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            .btn-primary:hover {
+                background: var(--alma-teal-dark);
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Replace main content with extraction results
+    document.querySelector('.main-content').innerHTML = extractionHTML;
+}
+
+// Proceed to G-28 extraction (Phase 4)
+function proceedToG28Extraction() {
+    alert('G-28 extraction will be implemented in Phase 4');
 }
 
 // Utility Functions
