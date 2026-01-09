@@ -382,8 +382,8 @@ class FieldValidator:
                 if message and not is_valid:
                     field_errors[field_name] = message
             
-            # Date fields
-            elif any(date_key in field_lower for date_key in ['date', 'dob', 'birth', 'expiry']):
+            # Date fields (but not place_of_birth)
+            elif any(date_key in field_lower for date_key in ['date', 'dob', 'expiry']) or ('birth' in field_lower and 'place' not in field_lower):
                 is_valid, cleaned, message = self.validate_date(value, field_name)
                 validated_data[field_name] = cleaned
                 if message:

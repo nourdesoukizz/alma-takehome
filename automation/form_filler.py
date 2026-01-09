@@ -26,13 +26,22 @@ class FormFiller:
         self.page: Optional[Page] = None
         
     async def initialize(self, headless: bool = False):
-        """Initialize Playwright browser
+        """Initialize Playwright browser with improved error handling
         
         Args:
             headless: If False (default for local), shows the browser window
         """
         try:
             logger.info(f"Initializing Playwright browser (headless={headless})...")
+            
+            # Clean up any existing browser instance first
+            if hasattr(self, 'browser') and self.browser:
+                try:
+                    await self.browser.close()
+                except:
+                    pass
+                self.browser = None
+            
             self.playwright = await async_playwright().start()
             
             # Check if running locally
@@ -43,16 +52,29 @@ class FormFiller:
             browser_options = []
             
             if is_local and not headless:
-                # For local visible mode, try different browsers
+                # For local visible mode, prefer Firefox which is more stable
                 browser_options = [
-                    ("firefox", self.playwright.firefox, {"headless": False, "slow_mo": 100}),
-                    ("webkit", self.playwright.webkit, {"headless": False, "slow_mo": 100}),
-                    ("chromium-headless", self.playwright.chromium, {"headless": True, "args": ['--no-sandbox']}),
+                    ("firefox", self.playwright.firefox, {
+                        "headless": False, 
+                        "slow_mo": 100,
+                        "args": ['--width=1280', '--height=800']
+                    }),
+                    ("webkit", self.playwright.webkit, {
+                        "headless": False, 
+                        "slow_mo": 100
+                    }),
+                    ("chromium-headless", self.playwright.chromium, {
+                        "headless": True, 
+                        "args": ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+                    }),
                 ]
             else:
                 # For headless mode
                 browser_options = [
-                    ("chromium-headless", self.playwright.chromium, {"headless": True, "args": ['--no-sandbox', '--disable-setuid-sandbox']}),
+                    ("chromium-headless", self.playwright.chromium, {
+                        "headless": True, 
+                        "args": ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+                    }),
                 ]
             
             # Try each browser option
@@ -62,25 +84,44 @@ class FormFiller:
                     self.browser = await browser_type.launch(**launch_args)
                     logger.info(f"Successfully launched {browser_name}")
                     
+                    # Create browser context and page with error handling
+                    try:
+                        context = await self.browser.new_context(
+                            viewport={"width": 1280, "height": 800},
+                            ignore_https_errors=True
+                        )
+                        self.page = await context.new_page()
+                        
+                        # Set default timeout
+                        self.page.set_default_timeout(30000)
+                        
+                    except Exception as page_error:
+                        logger.error(f"Failed to create page for {browser_name}: {page_error}")
+                        await self.browser.close()
+                        self.browser = None
+                        continue
+                    
                     # If we had to fall back to headless mode in local env, warn the user
                     if is_local and browser_name == "chromium-headless":
                         logger.warning("Running in headless mode due to browser compatibility issues. Screenshots will be captured instead.")
                     
-                    break
+                    logger.info(f"Browser initialized successfully (visible={not headless})")
+                    return True
+                    
                 except Exception as e:
                     logger.warning(f"{browser_name} failed: {e}")
+                    if self.browser:
+                        try:
+                            await self.browser.close()
+                        except:
+                            pass
+                        self.browser = None
+                    
                     if browser_name == browser_options[-1][0]:
                         # This was the last option
                         raise Exception(f"All browser options failed. Last error: {e}")
             
-            # Create new page
-            self.page = await self.browser.new_page()
-            
-            # Set viewport for consistent rendering
-            await self.page.set_viewport_size({"width": 1280, "height": 800})
-            
-            logger.info(f"Browser initialized successfully (visible={not headless})")
-            return True
+            return False
             
         except Exception as e:
             logger.error(f"Failed to initialize browser: {str(e)}")
@@ -226,10 +267,18 @@ class FormFiller:
             # Handle radio buttons
             await self._fill_radio_fields(data, filled_fields, errors)
             
-            # Take screenshot of filled form
-            screenshot_path = "filled_form.png"
-            await self.page.screenshot(path=screenshot_path, full_page=True)
-            logger.info(f"Screenshot saved: {screenshot_path}")
+            # Take screenshot of filled form with error handling
+            try:
+                if self.page and not self.page.is_closed():
+                    screenshot_path = "filled_form.png"
+                    await self.page.screenshot(path=screenshot_path, full_page=True, timeout=10000)
+                    logger.info(f"Screenshot saved: {screenshot_path}")
+                else:
+                    screenshot_path = None
+                    logger.warning("Cannot take screenshot - page is closed")
+            except Exception as e:
+                screenshot_path = None
+                logger.warning(f"Could not take screenshot: {e}")
             
             return {
                 "success": len(filled_fields) > 0,
@@ -254,7 +303,7 @@ class FormFiller:
     
     def _create_field_mappings(self, data: Dict) -> Dict:
         """
-        Map extracted data to form field IDs
+        Map extracted data to form field IDs - Comprehensive mapping for all 31 fields
         
         Args:
             data: Extracted document data
@@ -264,115 +313,159 @@ class FormFiller:
         """
         mappings = {}
         
-        # Extract passport data
+        # Extract both data sources
         passport_data = data.get("passport", {})
-        if passport_data:
-            # Part 1 - Petitioner/Attorney Information (from passport holder)
-            # These fields are for the person filling the form
-            mappings["given-name"] = passport_data.get("first_name", "")
+        g28_data = data.get("g28", {})
+        
+        # ===== PART 1: ATTORNEY/REPRESENTATIVE INFORMATION =====
+        # Priority: G-28 data first, then passport as fallback
+        
+        # 1. Online Account Number (from G-28)
+        if g28_data:
+            eligibility = g28_data.get("eligibility", {})
+            uscis_account = eligibility.get("uscis_account", "")
+            if uscis_account:
+                mappings["online-account"] = uscis_account
+        
+        # 2. Attorney/Representative Name (G-28 priority, passport fallback)
+        if g28_data:
+            attorney = g28_data.get("attorney_name", {})
+            if attorney.get("last"):
+                mappings["family-name"] = attorney.get("last", "")
+            if attorney.get("first"):
+                mappings["given-name"] = attorney.get("first", "")
+            if attorney.get("middle"):
+                mappings["middle-name"] = attorney.get("middle", "")
+        
+        # Use passport data as fallback for name fields if G-28 is empty
+        if not mappings.get("family-name") and passport_data:
             mappings["family-name"] = passport_data.get("last_name", "")
-            
-            # Try to extract middle name from full name if available
+        if not mappings.get("given-name") and passport_data:
+            mappings["given-name"] = passport_data.get("first_name", "")
+        if not mappings.get("middle-name") and passport_data:
+            # Try to extract middle name from full name
             full_name = passport_data.get("full_name", "")
             if full_name:
                 parts = full_name.split()
-                if len(parts) == 3:
-                    mappings["middle-name"] = parts[1]
-                elif len(parts) == 2:
-                    mappings["given-name"] = parts[0]
-                    mappings["family-name"] = parts[1]
+                if len(parts) >= 3:
+                    mappings["middle-name"] = " ".join(parts[1:-1])  # Everything between first and last
+        
+        # 3. Address Information (from G-28)
+        if g28_data:
+            address = g28_data.get("address", {})
             
-            # Part 3 - Beneficiary Passport Information
-            # These are the specific passport fields with "passport-" prefix
-            mappings["passport-surname"] = passport_data.get("last_name", "")
-            mappings["passport-given-names"] = passport_data.get("first_name", "")
-            mappings["passport-number"] = passport_data.get("passport_number", "")
+            # Street number and name
+            street = address.get("street", "")
+            if street:
+                # Full street address goes in street-number field
+                mappings["street-number"] = street
+            
+            # Apartment/Suite
+            suite = address.get("suite", "")
+            if suite:
+                mappings["apt-number"] = suite
+            
+            # City, State, ZIP
+            if address.get("city"):
+                mappings["city"] = address.get("city", "")
+            if address.get("state"):
+                mappings["state"] = address.get("state", "")
+            if address.get("zip"):
+                mappings["zip"] = address.get("zip", "")
+            
+            # Country (from G-28 or passport)
+            country = address.get("country", "")
+            if country:
+                mappings["country"] = country
+            elif passport_data:
+                # Use passport country as fallback
+                mappings["country"] = passport_data.get("nationality", "") or passport_data.get("country_code", "")
+        
+        # 4. Contact Information (from G-28)
+        if g28_data:
+            contact = g28_data.get("contact", {})
+            
+            if contact.get("phone"):
+                mappings["daytime-phone"] = contact.get("phone", "")
+            if contact.get("mobile"):
+                mappings["mobile-phone"] = contact.get("mobile", "")
+            if contact.get("email"):
+                mappings["email"] = contact.get("email", "")
+            if contact.get("fax"):
+                mappings["fax-number"] = contact.get("fax", "")
+        
+        # ===== PART 2: ELIGIBILITY/LICENSING INFORMATION =====
+        if g28_data:
+            eligibility = g28_data.get("eligibility", {})
+            
+            # Bar information
+            if eligibility.get("bar_number"):
+                mappings["bar-number"] = eligibility.get("bar_number", "")
+            if eligibility.get("bar_state"):
+                mappings["licensing-authority"] = eligibility.get("bar_state", "")
+            
+            # Law firm name
+            firm_name = g28_data.get("firm_name", "")
+            if firm_name:
+                mappings["law-firm"] = firm_name
+            
+            # For accredited representatives (if type is accredited_representative)
+            if eligibility.get("type") == "accredited_representative":
+                if eligibility.get("organization"):
+                    mappings["recognized-org"] = eligibility.get("organization", "")
+                if eligibility.get("accreditation_date"):
+                    mappings["accreditation-date"] = eligibility.get("accreditation_date", "")
+        
+        # Fields we cannot fill (not in extracted data):
+        # - "associated-with-name" - Not available in documents
+        # - "student-name" - Law student info not in documents
+        
+        # ===== PART 3: BENEFICIARY PASSPORT INFORMATION =====
+        if passport_data:
+            # Names
+            if passport_data.get("last_name"):
+                mappings["passport-surname"] = passport_data.get("last_name", "")
+            if passport_data.get("first_name"):
+                mappings["passport-given-names"] = passport_data.get("first_name", "")
+            
+            # Passport details
+            if passport_data.get("passport_number"):
+                mappings["passport-number"] = passport_data.get("passport_number", "")
             
             # Country and nationality
             country_code = passport_data.get("country_code", "")
             nationality = passport_data.get("nationality", "")
             
-            # Map to the correct fields
-            mappings["passport-country"] = country_code or nationality  # Country of Issue
-            mappings["passport-nationality"] = nationality or country_code  # Nationality
-            
-            # Also set country in Part 1 address section
             if country_code or nationality:
-                mappings["country"] = country_code or nationality
+                mappings["passport-country"] = country_code or nationality  # Country of Issue
+                mappings["passport-nationality"] = nationality or country_code  # Nationality
             
             # Dates
-            dob = passport_data.get("date_of_birth", "")
-            if dob:
-                mappings["passport-dob"] = dob  # Date of Birth for beneficiary
+            if passport_data.get("date_of_birth"):
+                mappings["passport-dob"] = passport_data.get("date_of_birth", "")
             
-            issue_date = passport_data.get("issue_date", "")
-            if issue_date:
-                mappings["passport-issue-date"] = issue_date
-                
-            expiry_date = passport_data.get("expiry_date", "")
-            if expiry_date:
-                mappings["passport-expiry-date"] = expiry_date
+            if passport_data.get("issue_date"):
+                mappings["passport-issue-date"] = passport_data.get("issue_date", "")
             
-            # Place of birth (if available)
-            place_of_birth = passport_data.get("place_of_birth", "")
-            if place_of_birth:
-                mappings["passport-pob"] = place_of_birth
+            if passport_data.get("expiry_date"):
+                mappings["passport-expiry-date"] = passport_data.get("expiry_date", "")
+            
+            # Place of birth (if available from OCR)
+            if passport_data.get("place_of_birth"):
+                mappings["passport-pob"] = passport_data.get("place_of_birth", "")
             
             # Gender/Sex
-            sex = passport_data.get("sex", "")
-            if sex:
-                mappings["passport-sex"] = sex
+            if passport_data.get("sex"):
+                mappings["passport-sex"] = passport_data.get("sex", "")
         
-        # Extract G-28 data
-        g28_data = data.get("g28", {})
-        if g28_data:
-            # Attorney information - these might map to petitioner/client fields
-            attorney = g28_data.get("attorney_name", {})
-            if not mappings.get("given-name") and attorney.get("first"):
-                mappings["given-name"] = attorney.get("first", "")
-            if not mappings.get("family-name") and attorney.get("last"):
-                mappings["family-name"] = attorney.get("last", "")
-            if not mappings.get("middle-name") and attorney.get("middle"):
-                mappings["middle-name"] = attorney.get("middle", "")
-            
-            # Address information
-            address = g28_data.get("address", {})
-            street = address.get("street", "")
-            if street:
-                # Try to extract street number from full street address
-                parts = street.split(None, 1)
-                if parts and parts[0].replace('-', '').isdigit():
-                    mappings["street-number"] = parts[0]
-                    if len(parts) > 1:
-                        mappings["street-name"] = parts[1]
-                else:
-                    mappings["street-number"] = street
-            
-            # Suite/Apt information
-            suite = address.get("suite", "")
-            if suite:
-                mappings["apt-number"] = suite
-            
-            mappings["city"] = address.get("city", "")
-            mappings["state"] = address.get("state", "")
-            mappings["zip"] = address.get("zip", "")
-            
-            # Contact information - use hyphenated field names
-            contact = g28_data.get("contact", {})
-            mappings["daytime-phone"] = contact.get("phone", "")
-            mappings["mobile-phone"] = contact.get("mobile", "")
-            mappings["email"] = contact.get("email", "")
-            mappings["fax-number"] = contact.get("fax", "")
-            
-            # Bar/Eligibility information
-            eligibility = g28_data.get("eligibility", {})
-            mappings["bar-number"] = eligibility.get("bar_number", "")
-            mappings["licensing-authority"] = eligibility.get("bar_state", "")
-            
-            # USCIS online account
-            uscis_account = eligibility.get("uscis_account", "")
-            if uscis_account:
-                mappings["online-account"] = uscis_account
+        # ===== PART 4: SIGNATURE FIELDS =====
+        # These cannot be auto-filled and require manual entry:
+        # - "client-signature-date"
+        # - "attorney-signature-date"
+        
+        # Log what fields we're filling
+        logger.info(f"Field mappings created: {len(mappings)} fields will be filled")
+        logger.info(f"Fields that will remain empty: associated-with-name, student-name, client-signature-date, attorney-signature-date")
         
         # Remove empty values
         return {k: v for k, v in mappings.items() if v}
@@ -403,7 +496,7 @@ class FormFiller:
                     
                     if value:
                         try:
-                            await select.select_option(value=value)
+                            await select.select_option(value=value, timeout=5000)
                             filled_fields.append({
                                 "field": select_id,
                                 "value": value,
@@ -413,7 +506,7 @@ class FormFiller:
                         except:
                             # Try selecting by label
                             try:
-                                await select.select_option(label=value)
+                                await select.select_option(label=value, timeout=5000)
                                 filled_fields.append({
                                     "field": select_id,
                                     "value": value,
@@ -443,24 +536,30 @@ class FormFiller:
                 
                 for selector in gender_selectors:
                     try:
-                        radio = await self.page.query_selector(selector)
-                        if radio:
-                            await radio.click()
-                            filled_fields.append({
-                                "field": "gender_radio",
-                                "value": gender,
-                                "type": "radio"
-                            })
-                            logger.info(f"Selected gender radio: {gender}")
+                        # Check if page is still connected
+                        if self.page and not self.page.is_closed():
+                            radio = await self.page.query_selector(selector)
+                            if radio:
+                                await radio.click(timeout=5000)
+                                filled_fields.append({
+                                    "field": "gender_radio",
+                                    "value": gender,
+                                    "type": "radio"
+                                })
+                                logger.info(f"Selected gender radio: {gender}")
+                                break
+                        else:
+                            logger.warning("Page closed - skipping gender radio")
                             break
-                    except:
+                    except Exception as e:
+                        logger.debug(f"Could not select {selector}: {e}")
                         continue
                         
         except Exception as e:
             errors.append(f"Error filling radio fields: {str(e)}")
     
     async def cleanup(self, keep_open: bool = False):
-        """Clean up browser resources
+        """Clean up browser resources with improved error handling
         
         Args:
             keep_open: If True, keeps the browser open (useful for local development)
@@ -477,11 +576,31 @@ class FormFiller:
                     pass
             else:
                 if self.page:
-                    await self.page.close()
+                    try:
+                        if not self.page.is_closed():
+                            await self.page.close()
+                    except Exception as e:
+                        logger.debug(f"Error closing page: {e}")
+                    finally:
+                        self.page = None
+                        
                 if self.browser:
-                    await self.browser.close()
+                    try:
+                        if self.browser.is_connected():
+                            await self.browser.close()
+                    except Exception as e:
+                        logger.debug(f"Error closing browser: {e}")
+                    finally:
+                        self.browser = None
+                        
                 if hasattr(self, 'playwright'):
-                    await self.playwright.stop()
+                    try:
+                        await self.playwright.stop()
+                    except Exception as e:
+                        logger.debug(f"Error stopping playwright: {e}")
+                    finally:
+                        self.playwright = None
+                        
                 logger.info("Browser cleanup completed")
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
