@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
 from extractors.passport_extractor import PassportExtractor
+from extractors.g28_extractor import G28Extractor
 
 # Load environment variables
 load_dotenv()
@@ -268,6 +269,62 @@ async def get_passport_extraction(session_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get extraction: {str(e)}")
+
+@app.post("/api/extract/g28/{session_id}")
+async def extract_g28_data(session_id: str):
+    """Extract data from uploaded G-28 form"""
+    try:
+        session_dir = UPLOADS_DIR / session_id
+        
+        if not session_dir.exists():
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Find G-28 file
+        g28_file = None
+        for file_path in session_dir.glob("*"):
+            if "g28" in file_path.name.lower() or "g-28" in file_path.name.lower():
+                g28_file = file_path
+                break
+        
+        if not g28_file:
+            # Try to find any image/PDF file that's not the passport
+            passport_files = [f for f in session_dir.glob("*") if "passport" in f.name.lower()]
+            for file_path in session_dir.glob("*"):
+                if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.pdf']:
+                    if file_path not in passport_files:
+                        g28_file = file_path
+                        break
+        
+        if not g28_file:
+            raise HTTPException(status_code=404, detail="G-28 file not found")
+        
+        # Extract data
+        extractor = G28Extractor()
+        result = extractor.extract(str(g28_file))
+        
+        # Store extraction results in session
+        result['sessionId'] = session_id
+        result['filename'] = g28_file.name
+        
+        return JSONResponse(content=result)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"G-28 extraction failed: {str(e)}")
+
+@app.get("/api/extract/g28/{session_id}")
+async def get_g28_extraction(session_id: str):
+    """Get previously extracted G-28 data"""
+    try:
+        # For now, re-extract on GET request
+        # In production, this would retrieve cached results
+        return await extract_g28_data(session_id)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get G-28 extraction: {str(e)}")
 
 # Mount static files (this should be last)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

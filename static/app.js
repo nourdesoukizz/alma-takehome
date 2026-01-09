@@ -486,7 +486,7 @@ function displayExtractionResults(result) {
             
             <div class="extraction-actions">
                 <button class="btn-secondary" onclick="location.reload()">Upload Different Documents</button>
-                <button class="btn-primary" onclick="proceedToG28Extraction()">Continue to G-28 Extraction</button>
+                <button class="btn-primary" id="g28ExtractionBtn">Continue to G-28 Extraction</button>
             </div>
         </div>
     `;
@@ -575,11 +575,350 @@ function displayExtractionResults(result) {
     
     // Replace main content with extraction results
     document.querySelector('.main-content').innerHTML = extractionHTML;
+    
+    // Add event listener for G-28 extraction button after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        const g28Btn = document.getElementById('g28ExtractionBtn');
+        console.log('Looking for G-28 button:', g28Btn);
+        if (g28Btn) {
+            g28Btn.onclick = function() {
+                console.log('G-28 button clicked via onclick');
+                window.proceedToG28Extraction();
+            };
+            console.log('G-28 button onclick handler attached');
+        } else {
+            console.error('G-28 button not found in DOM');
+        }
+    }, 100);
 }
 
 // Proceed to G-28 extraction (Phase 4)
-function proceedToG28Extraction() {
-    alert('G-28 extraction will be implemented in Phase 4');
+async function proceedToG28Extraction() {
+    console.log('proceedToG28Extraction function called');
+    
+    try {
+        // Get session from localStorage (we're in extraction phase now)
+        const sessionData = JSON.parse(localStorage.getItem('uploadSession'));
+        console.log('Session data from localStorage:', sessionData);
+        
+        if (!sessionData || !sessionData.sessionId) {
+            console.error('No session found in localStorage');
+            alert('No session found. Please upload documents first.');
+            return;
+        }
+        
+        console.log('Starting G-28 extraction with session:', sessionData.sessionId);
+        showLoading('Extracting G-28 data...');
+        
+        const response = await fetch(`/api/extract/g28/${sessionData.sessionId}`, {
+            method: 'POST'
+        });
+        
+        console.log('G-28 extraction response status:', response.status);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('G-28 extraction API error:', error);
+            throw new Error(error.detail || 'G-28 extraction failed');
+        }
+        
+        const result = await response.json();
+        console.log('G-28 extraction result:', result);
+        
+        hideLoading();
+        
+        if (result.success) {
+            displayG28Results(result);
+        } else {
+            showError('G-28 extraction failed. Please try again or check the document quality.');
+        }
+    } catch (error) {
+        console.error('G-28 extraction error:', error);
+        hideLoading();
+        alert(`G-28 extraction failed: ${error.message}`);
+    }
+}
+
+// Make function globally available
+window.proceedToG28Extraction = proceedToG28Extraction;
+
+// Display G-28 extraction results
+function displayG28Results(result) {
+    const extractionHTML = `
+        <div class="extraction-results">
+            <style>
+                .extraction-results {
+                    padding: 20px;
+                    max-width: 800px;
+                    margin: 0 auto;
+                }
+                .results-header {
+                    background: var(--alma-teal);
+                    color: white;
+                    padding: 24px;
+                    border-radius: 12px;
+                    margin-bottom: 24px;
+                }
+                .results-header h2 {
+                    margin: 0;
+                    font-size: 24px;
+                }
+                .extraction-info {
+                    background: #f8f9fa;
+                    padding: 16px;
+                    border-radius: 8px;
+                    margin-top: 12px;
+                }
+                .extraction-info span {
+                    display: inline-block;
+                    margin-right: 24px;
+                    font-size: 14px;
+                }
+                .confidence-badge {
+                    background: ${result.confidence >= 0.8 ? '#28a745' : result.confidence >= 0.6 ? '#ffc107' : '#dc3545'};
+                    color: white;
+                    padding: 4px 12px;
+                    border-radius: 16px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+                .form-section {
+                    background: white;
+                    border: 1px solid var(--alma-border);
+                    border-radius: 12px;
+                    padding: 24px;
+                    margin-bottom: 20px;
+                }
+                .form-section h3 {
+                    color: var(--alma-teal);
+                    margin-top: 0;
+                    margin-bottom: 20px;
+                    font-size: 18px;
+                    border-bottom: 2px solid var(--alma-light);
+                    padding-bottom: 8px;
+                }
+                .form-group {
+                    margin-bottom: 20px;
+                }
+                .form-group label {
+                    display: block;
+                    color: var(--alma-text-secondary);
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                    font-weight: 600;
+                }
+                .form-group input, .form-group select {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid var(--alma-border);
+                    border-radius: 6px;
+                    font-size: 16px;
+                }
+                .form-row {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                    gap: 16px;
+                }
+                .action-buttons {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 32px;
+                }
+                .btn-secondary {
+                    background: var(--alma-border);
+                    color: var(--alma-text);
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 600;
+                }
+                .btn-primary {
+                    background: var(--alma-teal);
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 600;
+                }
+                .btn-primary:hover {
+                    background: var(--alma-teal-dark);
+                }
+            </style>
+            
+            <div class="results-header">
+                <h2>G-28 Form Data Extracted</h2>
+                <div class="extraction-info">
+                    <span>📄 Document: ${result.filename || 'G-28 Form'}</span>
+                    <span class="confidence-badge">
+                        Confidence: ${Math.round((result.confidence || 0) * 100)}%
+                    </span>
+                    <span>Method: ${result.method || 'OCR'}</span>
+                </div>
+            </div>
+            
+            <form id="g28DataForm">
+                <!-- Attorney Information -->
+                <div class="form-section">
+                    <h3>Attorney/Representative Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <input type="text" name="attorney_last_name" 
+                                value="${result.data?.attorney_name?.last || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <input type="text" name="attorney_first_name" 
+                                value="${result.data?.attorney_name?.first || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Middle Name</label>
+                            <input type="text" name="attorney_middle_name" 
+                                value="${result.data?.attorney_name?.middle || ''}" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Law Firm/Organization Name</label>
+                        <input type="text" name="firm_name" 
+                            value="${result.data?.firm_name || ''}" />
+                    </div>
+                </div>
+                
+                <!-- Eligibility Information -->
+                <div class="form-section">
+                    <h3>Eligibility Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select name="attorney_type">
+                                <option value="attorney" ${result.data?.eligibility?.type === 'attorney' ? 'selected' : ''}>
+                                    Attorney
+                                </option>
+                                <option value="accredited_representative" 
+                                    ${result.data?.eligibility?.type === 'accredited_representative' ? 'selected' : ''}>
+                                    Accredited Representative
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Bar Number</label>
+                            <input type="text" name="bar_number" 
+                                value="${result.data?.eligibility?.bar_number || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Bar State</label>
+                            <input type="text" name="bar_state" 
+                                value="${result.data?.eligibility?.bar_state || ''}" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>USCIS Account Number (if any)</label>
+                        <input type="text" name="uscis_account" 
+                            value="${result.data?.eligibility?.uscis_account || ''}" />
+                    </div>
+                </div>
+                
+                <!-- Contact Information -->
+                <div class="form-section">
+                    <h3>Contact Information</h3>
+                    <div class="form-group">
+                        <label>Street Address</label>
+                        <input type="text" name="street_address" 
+                            value="${result.data?.address?.street || ''}" />
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Suite/Floor/Apt</label>
+                            <input type="text" name="suite" 
+                                value="${result.data?.address?.suite || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>City</label>
+                            <input type="text" name="city" 
+                                value="${result.data?.address?.city || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>State</label>
+                            <input type="text" name="state" 
+                                value="${result.data?.address?.state || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>ZIP Code</label>
+                            <input type="text" name="zip" 
+                                value="${result.data?.address?.zip || ''}" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Daytime Phone</label>
+                            <input type="tel" name="phone" 
+                                value="${result.data?.contact?.phone || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Mobile Phone</label>
+                            <input type="tel" name="mobile" 
+                                value="${result.data?.contact?.mobile || ''}" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" name="email" 
+                                value="${result.data?.contact?.email || ''}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Fax Number</label>
+                            <input type="tel" name="fax" 
+                                value="${result.data?.contact?.fax || ''}" />
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" class="btn-secondary" onclick="location.reload()">
+                        Start Over
+                    </button>
+                    <button type="button" class="btn-primary" onclick="proceedToFormFilling()">
+                        Continue to Form Filling
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    // Add styles if not already present
+    if (!document.querySelector('style[data-extraction-styles]')) {
+        const styles = document.createElement('style');
+        styles.setAttribute('data-extraction-styles', 'true');
+        styles.textContent = `
+            :root {
+                --alma-teal: #4A7C7E;
+                --alma-teal-dark: #3a6c6e;
+                --alma-light: #B8D4D3;
+                --alma-lighter: #E8F3F3;
+                --alma-text: #2C3E50;
+                --alma-text-secondary: #5A6C7D;
+                --alma-border: #D1D9E0;
+                --alma-bg: #F7FAFA;
+                --alma-white: #FFFFFF;
+                --alma-success: #28a745;
+                --alma-warning: #ffc107;
+                --alma-error: #dc3545;
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Replace main content with extraction results
+    document.querySelector('.main-content').innerHTML = extractionHTML;
+}
+
+// Proceed to form filling (Phase 5)
+function proceedToFormFilling() {
+    console.log('Form filling will be implemented in Phase 5');
+    alert('Form filling will be implemented in Phase 5. Both passport and G-28 data have been extracted successfully.');
 }
 
 // Utility Functions
@@ -590,23 +929,140 @@ function formatFileSize(bytes) {
 }
 
 function showLoading(text = 'Uploading...') {
-    const overlay = document.getElementById('loadingOverlay');
+    let overlay = document.getElementById('loadingOverlay');
+    
+    // If loading overlay doesn't exist, create it
+    if (!overlay) {
+        // Add styles if not present
+        if (!document.querySelector('style[data-loading-styles]')) {
+            const styles = document.createElement('style');
+            styles.setAttribute('data-loading-styles', 'true');
+            styles.textContent = `
+                .loading-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 9999;
+                }
+                .loading-content {
+                    background: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    text-align: center;
+                }
+                .spinner {
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #4A7C7E;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        const overlayHTML = `
+            <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Loading...</p>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', overlayHTML);
+        overlay = document.getElementById('loadingOverlay');
+    }
+    
     const loadingText = document.getElementById('loadingText');
-    loadingText.textContent = text;
+    if (loadingText) {
+        loadingText.textContent = text;
+    }
     overlay.style.display = 'flex';
 }
 
 function hideLoading() {
-    document.getElementById('loadingOverlay').style.display = 'none';
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
 }
 
 function showError(message) {
-    const container = document.getElementById('errorContainer');
+    let container = document.getElementById('errorContainer');
+    
+    // If error container doesn't exist, create it
+    if (!container) {
+        const errorHTML = `
+            <div id="errorContainer" class="error-container" style="display: none;">
+                <div class="error-content">
+                    <span id="errorText"></span>
+                    <button onclick="clearError()" class="error-close">×</button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', errorHTML);
+        
+        // Add styles if not present
+        if (!document.querySelector('style[data-error-styles]')) {
+            const styles = document.createElement('style');
+            styles.setAttribute('data-error-styles', 'true');
+            styles.textContent = `
+                .error-container {
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #dc3545;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 5px;
+                    z-index: 10000;
+                    max-width: 500px;
+                }
+                .error-content {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                .error-close {
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 24px;
+                    cursor: pointer;
+                    margin-left: 20px;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        container = document.getElementById('errorContainer');
+    }
+    
     const errorText = document.getElementById('errorText');
-    errorText.textContent = message;
-    container.style.display = 'block';
+    if (errorText) {
+        errorText.textContent = message;
+    }
+    if (container) {
+        container.style.display = 'block';
+    }
 }
 
 function clearError() {
-    document.getElementById('errorContainer').style.display = 'none';
+    const container = document.getElementById('errorContainer');
+    if (container) {
+        container.style.display = 'none';
+    }
 }
