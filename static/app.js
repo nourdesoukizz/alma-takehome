@@ -643,8 +643,38 @@ async function proceedToG28Extraction() {
 window.proceedToG28Extraction = proceedToG28Extraction;
 
 // Proceed to form filling
-async function proceedToFormFilling() {
+async function proceedToFormFilling(event) {
     console.log('Proceeding to form filling...');
+    
+    // Find the button and show loading state
+    const button = (event && event.target) || document.querySelector('button[onclick*="proceedToFormFilling"]');
+    const originalText = button ? button.innerHTML : 'Continue to Form Filling';
+    
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = `
+            <span style="display: inline-flex; align-items: center; gap: 8px;">
+                <svg style="animation: spin 1s linear infinite; width: 20px; height: 20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle style="opacity: 0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path style="opacity: 0.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Preparing form...
+            </span>
+        `;
+        
+        // Add spinning animation if not already present
+        if (!document.querySelector('#loadingSpinnerStyle')) {
+            const style = document.createElement('style');
+            style.id = 'loadingSpinnerStyle';
+            style.textContent = `
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
     
     try {
         // Get session data
@@ -672,6 +702,13 @@ async function proceedToFormFilling() {
         
     } catch (error) {
         console.error('Error proceeding to form filling:', error);
+        
+        // Restore button state on error
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+        
         showError('Failed to proceed to form filling. Please try again.');
     }
 }
@@ -916,7 +953,7 @@ function displayG28Results(result) {
                     <button type="button" class="btn-secondary" onclick="location.reload()">
                         Start Over
                     </button>
-                    <button type="button" class="btn-primary" onclick="proceedToFormFilling()">
+                    <button type="button" class="btn-primary" onclick="proceedToFormFilling(event)">
                         Continue to Form Filling
                     </button>
                 </div>
