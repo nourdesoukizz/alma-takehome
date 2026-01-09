@@ -822,12 +822,8 @@ function displayG28Results(result) {
             
             <div class="results-header">
                 <h2>G-28 Form Data Extracted</h2>
-                <div class="extraction-info">
-                    <span>📄 Document: ${result.filename || 'G-28 Form'}</span>
-                    <span class="confidence-badge">
-                        Confidence: ${Math.round((result.confidence || 0) * 100)}%
-                    </span>
-                    <span>Method: ${result.method || 'OCR'}</span>
+                <div class="extraction-info" style="color: black;">
+                    <span>📄 Document: ${result.filename || 'g28.pdf'}</span>
                 </div>
             </div>
             
