@@ -3,13 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Form Filling - Alma Immigration</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Form Filling - Alma Document Processing</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Additional page-specific styles */
+        .form-fill-wrapper {
+            min-height: 100vh;
+            background: var(--alma-light-bg);
+        }
+        
         .form-fill-container {
-            max-width: 800px;
-            margin: 2rem auto;
-            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 48px 20px;
         }
         
         .progress-steps {
@@ -26,7 +35,7 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: #e0e0e0;
+            background: var(--alma-border);
             z-index: -1;
         }
         
@@ -41,8 +50,8 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: #e0e0e0;
-            color: #666;
+            background: var(--alma-border);
+            color: var(--alma-text-light);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -51,25 +60,26 @@
         }
         
         .step.completed .step-number {
-            background: #4A7C7E;
-            color: white;
+            background: var(--alma-teal);
+            color: var(--alma-white);
         }
         
         .step.active .step-number {
-            background: #FFA500;
-            color: white;
+            background: var(--alma-warning);
+            color: var(--alma-text);
         }
         
         .step-title {
             font-size: 0.9rem;
-            color: #666;
+            color: var(--alma-text-light);
         }
         
         .extraction-summary {
-            background: #f9f9f9;
-            border-radius: 8px;
-            padding: 1.5rem;
+            background: var(--alma-white);
+            border-radius: 16px;
+            padding: 2rem;
             margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         
         .data-section {
@@ -77,11 +87,13 @@
         }
         
         .data-section h3 {
-            color: #4A7C7E;
+            color: var(--alma-teal);
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            font-size: 18px;
+            font-weight: 600;
         }
         
         .data-grid {
@@ -91,21 +103,21 @@
         }
         
         .data-item {
-            background: white;
+            background: var(--alma-light-bg);
             padding: 0.75rem;
-            border-radius: 4px;
-            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            border: 1px solid var(--alma-border);
         }
         
         .data-label {
             font-size: 0.85rem;
-            color: #666;
+            color: var(--alma-text-light);
             margin-bottom: 0.25rem;
         }
         
         .data-value {
             font-weight: 500;
-            color: #333;
+            color: var(--alma-text);
         }
         
         .form-fill-status {
@@ -119,73 +131,107 @@
         }
         
         .btn-fill-form {
-            background: #4A7C7E;
-            color: white;
-            padding: 1rem 2rem;
+            background: var(--alma-teal);
+            color: var(--alma-white);
+            padding: 16px 48px;
             border: none;
-            border-radius: 4px;
-            font-size: 1.1rem;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
             margin-top: 1rem;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
         }
         
         .btn-fill-form:hover {
-            background: #3a6c6e;
+            background: var(--alma-teal-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(74, 124, 126, 0.3);
         }
         
         .btn-secondary {
-            background: #666;
-            color: white;
-            padding: 0.75rem 1.5rem;
+            background: var(--alma-text-light);
+            color: var(--alma-white);
+            padding: 12px 24px;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             margin: 0 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: var(--alma-text);
+            transform: translateY(-1px);
         }
         
         .result-section {
             margin-top: 2rem;
-            padding: 1.5rem;
-            background: #f0f7f7;
-            border-radius: 8px;
-            border: 1px solid #4A7C7E;
+            padding: 2rem;
+            background: var(--alma-white);
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result-section h3 {
+            color: var(--alma-success);
+            margin-bottom: 1rem;
         }
         
         .filled-fields {
             max-height: 300px;
             overflow-y: auto;
-            background: white;
+            background: var(--alma-light-bg);
             padding: 1rem;
-            border-radius: 4px;
+            border-radius: 8px;
             margin-top: 1rem;
+            border: 1px solid var(--alma-border);
         }
         
         .field-item {
             padding: 0.5rem;
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--alma-border);
         }
         
         .field-item:last-child {
             border-bottom: none;
         }
         
-        .error-message {
-            background: #fee;
-            color: #c00;
-            padding: 1rem;
-            border-radius: 4px;
+        .error-section {
+            background: #FFF3CD;
+            border: 1px solid var(--alma-warning);
+            color: #856404;
+            padding: 1.5rem;
+            border-radius: 8px;
             margin-top: 1rem;
+        }
+        
+        .error-section h3 {
+            color: var(--alma-error);
+            margin-bottom: 0.5rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <header class="header">
-            <h1 class="logo">Alma</h1>
-            <p class="tagline">Immigration Document Processing</p>
+            <img src="alma-logo.png" alt="Alma" class="logo">
+            <div class="header-text">Document Processing Portal</div>
         </header>
         
-        <main class="form-fill-container">
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Hero Section -->
+            <div class="hero-section">
+                <h1 class="hero-title">Form Auto-Fill</h1>
+                <p class="hero-subtitle">
+                    Review your extracted data and automatically fill the immigration form
+                </p>
+            </div>
+            
+            <div class="form-fill-container">
             <!-- Progress Steps -->
             <div class="progress-steps">
                 <div class="step completed">
@@ -205,6 +251,12 @@
             <!-- Extraction Summary -->
             <div class="extraction-summary" id="extractionSummary">
                 <h2>Extracted Document Data</h2>
+                
+                <!-- Validation Summary -->
+                <div id="validationSummary" style="display: none; margin: 1rem 0; padding: 1rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px;">
+                    <h3 style="margin: 0 0 0.5rem 0; color: #d97706;">⚠️ Data Validation Issues</h3>
+                    <div id="validationIssues"></div>
+                </div>
                 
                 <!-- Passport Data -->
                 <div class="data-section" id="passportSection">
@@ -253,10 +305,11 @@
             </div>
             
             <!-- Error Section -->
-            <div id="errorSection" class="error-message" style="display: none;">
+            <div id="errorSection" class="error-section" style="display: none;">
                 <h3>❌ Form Filling Failed</h3>
                 <p id="errorMessage"></p>
                 <button class="btn-secondary" onclick="retryFilling()">Retry</button>
+            </div>
             </div>
         </main>
         
@@ -274,7 +327,69 @@
             displayExtractedData();
         };
         
+        function displayValidationIssues() {
+            const validationData = sessionData.validation || {};
+            const passportValidation = validationData.passport || {};
+            const g28Validation = validationData.g28 || {};
+            
+            let hasIssues = false;
+            let issuesHTML = '';
+            
+            // Check passport validation
+            if (passportValidation.errors && Object.keys(passportValidation.errors).length > 0) {
+                hasIssues = true;
+                issuesHTML += '<strong>Passport Data Errors:</strong><ul style="margin: 0.5rem 0;">';
+                for (const [field, error] of Object.entries(passportValidation.errors)) {
+                    issuesHTML += `<li style="color: #dc2626;">${field}: ${error}</li>`;
+                }
+                issuesHTML += '</ul>';
+            }
+            
+            // Check G-28 validation
+            if (g28Validation.errors && Object.keys(g28Validation.errors).length > 0) {
+                hasIssues = true;
+                issuesHTML += '<strong>G-28 Data Errors:</strong><ul style="margin: 0.5rem 0;">';
+                for (const [field, error] of Object.entries(g28Validation.errors)) {
+                    issuesHTML += `<li style="color: #dc2626;">${field}: ${error}</li>`;
+                }
+                issuesHTML += '</ul>';
+            }
+            
+            // Show warnings
+            if (passportValidation.warnings && Object.keys(passportValidation.warnings).length > 0) {
+                hasIssues = true;
+                issuesHTML += '<strong>Passport Data Warnings:</strong><ul style="margin: 0.5rem 0;">';
+                for (const [field, warning] of Object.entries(passportValidation.warnings)) {
+                    issuesHTML += `<li style="color: #d97706;">${field}: ${warning}</li>`;
+                }
+                issuesHTML += '</ul>';
+            }
+            
+            if (g28Validation.warnings && Object.keys(g28Validation.warnings).length > 0) {
+                hasIssues = true;
+                issuesHTML += '<strong>G-28 Data Warnings:</strong><ul style="margin: 0.5rem 0;">';
+                for (const [field, warning] of Object.entries(g28Validation.warnings)) {
+                    issuesHTML += `<li style="color: #d97706;">${field}: ${warning}</li>`;
+                }
+                issuesHTML += '</ul>';
+            }
+            
+            // Display validation summary
+            const validationSummary = document.getElementById('validationSummary');
+            const validationIssues = document.getElementById('validationIssues');
+            
+            if (hasIssues) {
+                validationSummary.style.display = 'block';
+                validationIssues.innerHTML = issuesHTML;
+            } else {
+                validationSummary.style.display = 'none';
+            }
+        }
+        
         function displayExtractedData() {
+            // Check for validation issues
+            displayValidationIssues();
+            
             // Display passport data
             const passportData = sessionData.passport || {};
             const passportGrid = document.getElementById('passportData');
@@ -397,6 +512,28 @@
                 message = '🖥️ Form opened in a new browser window!\n\n';
                 message += `✅ Successfully filled ${result.filled_count || 0} fields\n`;
                 message += '👉 You can now interact with the form, review the data, and submit it manually.';
+            }
+            
+            // Add validation information
+            if (result.validation_errors && Object.keys(result.validation_errors).length > 0) {
+                message += '\n\n⚠️ <strong>Validation Errors Found:</strong>\n';
+                for (const [field, error] of Object.entries(result.validation_errors)) {
+                    message += `• ${field}: ${error}\n`;
+                }
+            }
+            
+            if (result.skipped_fields && result.skipped_fields.length > 0) {
+                message += '\n\n❌ <strong>Skipped Fields (due to validation errors):</strong>\n';
+                result.skipped_fields.forEach(skip => {
+                    message += `• ${skip.field}: ${skip.reason}\n`;
+                });
+            }
+            
+            if (result.validation_warnings && Object.keys(result.validation_warnings).length > 0) {
+                message += '\n\n⚡ <strong>Warnings:</strong>\n';
+                for (const [field, warning] of Object.entries(result.validation_warnings)) {
+                    message += `• ${field}: ${warning}\n`;
+                }
             }
             
             document.getElementById('resultMessage').innerHTML = message.replace(/\n/g, '<br>');

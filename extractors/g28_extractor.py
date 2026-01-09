@@ -6,6 +6,7 @@ Handles OCR and LLM-based parsing for attorney/representative information
 import re
 import json
 import os
+import sys
 from typing import Dict, Optional
 from pathlib import Path
 import pytesseract
@@ -15,6 +16,10 @@ import numpy as np
 from openai import OpenAI
 from dotenv import load_dotenv
 import pdf2image
+
+# Add parent directory to path to import validators
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from validators import FieldValidator
 
 # Load environment variables
 load_dotenv()
@@ -686,14 +691,57 @@ class G28Extractor:
             self.extraction_method = 'ocr_empty'
             self.confidence = 0.3
         
+        # Prepare data for validation
+        extracted_data = {
+            'attorney_name': attorney_name,
+            'firm_name': data.get('firm_name', ''),
+            'address': address,
+            'contact': contact,
+            'eligibility': eligibility
+        }
+        
+        # Flatten the data for validation
+        flat_data = {}
+        if attorney_name:
+            flat_data['attorney_first_name'] = attorney_name.get('first', '')
+            flat_data['attorney_last_name'] = attorney_name.get('last', '')
+            flat_data['attorney_middle_name'] = attorney_name.get('middle', '')
+        if address:
+            flat_data['street_address'] = address.get('street', '')
+            flat_data['city'] = address.get('city', '')
+            flat_data['state'] = address.get('state', '')
+            flat_data['zip_code'] = address.get('zip', '')
+        if contact:
+            flat_data['phone'] = contact.get('phone', '')
+            flat_data['mobile'] = contact.get('mobile', '')
+            flat_data['email'] = contact.get('email', '')
+        if eligibility:
+            flat_data['bar_number'] = eligibility.get('bar_number', '')
+        
+        # Validate the data
+        validator = FieldValidator(strict_mode=False)
+        validation_result = validator.validate_all_fields(flat_data)
+        
+        # Update fields with validated/cleaned data
+        if validation_result['data'].get('attorney_first_name'):
+            attorney_name['first'] = validation_result['data']['attorney_first_name']
+        if validation_result['data'].get('attorney_last_name'):
+            attorney_name['last'] = validation_result['data']['attorney_last_name']
+        if validation_result['data'].get('phone'):
+            contact['phone'] = validation_result['data']['phone']
+        if validation_result['data'].get('email'):
+            contact['email'] = validation_result['data']['email']
+        if validation_result['data'].get('zip_code'):
+            address['zip'] = validation_result['data']['zip_code']
+        
         return {
             'success': bool(data) or has_ocr,  # Success if we have data OR OCR text
-            'data': {
-                'attorney_name': attorney_name,
-                'firm_name': data.get('firm_name', ''),
-                'address': address,
-                'contact': contact,
-                'eligibility': eligibility
+            'data': extracted_data,
+            'validation': {
+                'errors': validation_result['errors'],
+                'warnings': validation_result['warnings'],
+                'total_errors': validation_result['total_errors'],
+                'total_warnings': validation_result['total_warnings']
             },
             'confidence': self.confidence,
             'method': self.extraction_method or 'none',

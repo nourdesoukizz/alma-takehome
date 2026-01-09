@@ -399,7 +399,7 @@ async function proceedToExtraction() {
         
         // Display error in the UI
         document.getElementById('successState').innerHTML = `
-            <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 8px; color: #856404;">
+            <div style="background: #FFF3CD; border: 1px solid var(--alma-warning); padding: 20px; border-radius: 8px; color: #856404;">
                 ${errorMsg}
                 <br><br>
                 <button class="btn-continue" onclick="location.reload()">Try Again</button>

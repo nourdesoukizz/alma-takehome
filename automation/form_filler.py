@@ -8,6 +8,12 @@ import json
 from typing import Dict, Optional
 from playwright.async_api import async_playwright, Page, Browser
 import logging
+import sys
+import os
+
+# Add parent directory to path to import validators
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from validators import FieldValidator
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +39,39 @@ class FormFiller:
             import os
             is_local = os.environ.get("ENVIRONMENT") == "local"
             
+            # Try different browser options in order
+            browser_options = []
+            
             if is_local and not headless:
-                # Local mode - simple browser launch with visible window
-                logger.info("Launching visible browser for local development...")
-                self.browser = await self.playwright.chromium.launch(
-                    headless=False,
-                    args=['--start-maximized'],
-                    slow_mo=100  # Slow down actions so you can see them
-                )
+                # For local visible mode, try different browsers
+                browser_options = [
+                    ("firefox", self.playwright.firefox, {"headless": False, "slow_mo": 100}),
+                    ("webkit", self.playwright.webkit, {"headless": False, "slow_mo": 100}),
+                    ("chromium-headless", self.playwright.chromium, {"headless": True, "args": ['--no-sandbox']}),
+                ]
             else:
-                # Headless mode (for testing or if explicitly requested)
-                self.browser = await self.playwright.chromium.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-setuid-sandbox']
-                )
+                # For headless mode
+                browser_options = [
+                    ("chromium-headless", self.playwright.chromium, {"headless": True, "args": ['--no-sandbox', '--disable-setuid-sandbox']}),
+                ]
+            
+            # Try each browser option
+            for browser_name, browser_type, launch_args in browser_options:
+                try:
+                    logger.info(f"Trying {browser_name}...")
+                    self.browser = await browser_type.launch(**launch_args)
+                    logger.info(f"Successfully launched {browser_name}")
+                    
+                    # If we had to fall back to headless mode in local env, warn the user
+                    if is_local and browser_name == "chromium-headless":
+                        logger.warning("Running in headless mode due to browser compatibility issues. Screenshots will be captured instead.")
+                    
+                    break
+                except Exception as e:
+                    logger.warning(f"{browser_name} failed: {e}")
+                    if browser_name == browser_options[-1][0]:
+                        # This was the last option
+                        raise Exception(f"All browser options failed. Last error: {e}")
             
             # Create new page
             self.page = await self.browser.new_page()
@@ -99,27 +124,57 @@ class FormFiller:
             
             return False
     
-    async def fill_form(self, data: Dict) -> Dict:
+    async def fill_form(self, data: Dict, validate: bool = True) -> Dict:
         """
         Fill the form with extracted data
         
         Args:
             data: Combined passport and G-28 extraction data
+            validate: Whether to validate fields before filling
             
         Returns:
-            Dict with success status and filled fields
+            Dict with success status, filled fields, and validation results
         """
         filled_fields = []
         errors = []
+        validation_errors = {}
+        validation_warnings = {}
+        skipped_fields = []
         
         try:
             # Map extracted data to form fields
             field_mappings = self._create_field_mappings(data)
             
+            # Validate fields if requested
+            if validate:
+                validator = FieldValidator(strict_mode=False)
+                validation_result = validator.validate_all_fields(field_mappings)
+                field_mappings = validation_result['data']  # Use cleaned data
+                validation_errors = validation_result['errors']
+                validation_warnings = validation_result['warnings']
+                
+                logger.info(f"Validation complete: {validation_result['total_errors']} errors, {validation_result['total_warnings']} warnings")
+                
+                # Log validation issues
+                for field, error in validation_errors.items():
+                    logger.error(f"Validation error for {field}: {error}")
+                for field, warning in validation_warnings.items():
+                    logger.warning(f"Validation warning for {field}: {warning}")
+            
             logger.info(f"Attempting to fill {len(field_mappings)} fields")
             
             for field_id, value in field_mappings.items():
                 if value:
+                    # Skip field if it has a validation error in strict mode
+                    if field_id in validation_errors and validate:
+                        logger.warning(f"Skipping field {field_id} due to validation error: {validation_errors[field_id]}")
+                        skipped_fields.append({
+                            "field": field_id,
+                            "reason": validation_errors[field_id],
+                            "original_value": value
+                        })
+                        continue
+                    
                     try:
                         # Try different selector strategies
                         selectors = [
@@ -139,11 +194,18 @@ class FormFiller:
                                     await self.page.fill(selector, "")
                                     # Fill with new value
                                     await self.page.fill(selector, str(value))
-                                    filled_fields.append({
+                                    
+                                    field_info = {
                                         "field": field_id,
                                         "value": value,
                                         "selector": selector
-                                    })
+                                    }
+                                    
+                                    # Add validation status
+                                    if field_id in validation_warnings:
+                                        field_info["warning"] = validation_warnings[field_id]
+                                    
+                                    filled_fields.append(field_info)
                                     filled = True
                                     logger.info(f"Filled field {field_id} with value: {value}")
                                     break
@@ -173,6 +235,9 @@ class FormFiller:
                 "success": len(filled_fields) > 0,
                 "filled_count": len(filled_fields),
                 "filled_fields": filled_fields,
+                "skipped_fields": skipped_fields,
+                "validation_errors": validation_errors,
+                "validation_warnings": validation_warnings,
                 "errors": errors,
                 "screenshot": screenshot_path
             }
@@ -202,7 +267,8 @@ class FormFiller:
         # Extract passport data
         passport_data = data.get("passport", {})
         if passport_data:
-            # Personal information - Map to actual form field IDs
+            # Part 1 - Petitioner/Attorney Information (from passport holder)
+            # These fields are for the person filling the form
             mappings["given-name"] = passport_data.get("first_name", "")
             mappings["family-name"] = passport_data.get("last_name", "")
             
@@ -216,20 +282,46 @@ class FormFiller:
                     mappings["given-name"] = parts[0]
                     mappings["family-name"] = parts[1]
             
-            # Document details
+            # Part 3 - Beneficiary Passport Information
+            # These are the specific passport fields with "passport-" prefix
+            mappings["passport-surname"] = passport_data.get("last_name", "")
+            mappings["passport-given-names"] = passport_data.get("first_name", "")
             mappings["passport-number"] = passport_data.get("passport_number", "")
             
-            # Country from passport
-            country = passport_data.get("country_code", "") or passport_data.get("nationality", "")
-            if country:
-                mappings["country"] = country
+            # Country and nationality
+            country_code = passport_data.get("country_code", "")
+            nationality = passport_data.get("nationality", "")
+            
+            # Map to the correct fields
+            mappings["passport-country"] = country_code or nationality  # Country of Issue
+            mappings["passport-nationality"] = nationality or country_code  # Nationality
+            
+            # Also set country in Part 1 address section
+            if country_code or nationality:
+                mappings["country"] = country_code or nationality
             
             # Dates
-            mappings["date-of-birth"] = passport_data.get("date_of_birth", "")
-            mappings["passport-expiry"] = passport_data.get("expiry_date", "")
+            dob = passport_data.get("date_of_birth", "")
+            if dob:
+                mappings["passport-dob"] = dob  # Date of Birth for beneficiary
+            
+            issue_date = passport_data.get("issue_date", "")
+            if issue_date:
+                mappings["passport-issue-date"] = issue_date
+                
+            expiry_date = passport_data.get("expiry_date", "")
+            if expiry_date:
+                mappings["passport-expiry-date"] = expiry_date
+            
+            # Place of birth (if available)
+            place_of_birth = passport_data.get("place_of_birth", "")
+            if place_of_birth:
+                mappings["passport-pob"] = place_of_birth
             
             # Gender/Sex
-            mappings["passport-sex"] = passport_data.get("sex", "")
+            sex = passport_data.get("sex", "")
+            if sex:
+                mappings["passport-sex"] = sex
         
         # Extract G-28 data
         g28_data = data.get("g28", {})

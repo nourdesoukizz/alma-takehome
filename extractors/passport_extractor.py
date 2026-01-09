@@ -5,6 +5,8 @@ Handles MRZ reading and OCR fallback for passport data extraction
 
 import re
 import json
+import sys
+import os
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 from pathlib import Path
@@ -14,6 +16,10 @@ import pytesseract
 from PIL import Image
 from passporteye import read_mrz
 import pdf2image
+
+# Add parent directory to path to import validators
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from validators import FieldValidator
 
 class PassportExtractor:
     """Extract data from passport images using MRZ and OCR"""
@@ -426,19 +432,32 @@ class PassportExtractor:
             given = data.get('names', data.get('given_names', ''))
             full_name = f"{given} {full_name}".strip()
         
+        # Prepare extracted data
+        extracted_data = {
+            'full_name': full_name,
+            'last_name': data.get('surname', ''),
+            'first_name': data.get('names', data.get('given_names', '')),
+            'passport_number': data.get('passport_number', ''),
+            'nationality': data.get('nationality', ''),
+            'country_code': data.get('country_code', ''),
+            'date_of_birth': data.get('date_of_birth', ''),
+            'sex': data.get('sex', ''),
+            'issue_date': data.get('issue_date', ''),
+            'expiry_date': data.get('expiry_date', ''),
+        }
+        
+        # Validate extracted data
+        validator = FieldValidator(strict_mode=False)
+        validation_result = validator.validate_all_fields(extracted_data)
+        
         return {
             'success': bool(data),
-            'data': {
-                'full_name': full_name,
-                'last_name': data.get('surname', ''),
-                'first_name': data.get('names', data.get('given_names', '')),
-                'passport_number': data.get('passport_number', ''),
-                'nationality': data.get('nationality', ''),
-                'country_code': data.get('country_code', ''),
-                'date_of_birth': data.get('date_of_birth', ''),
-                'sex': data.get('sex', ''),
-                'issue_date': data.get('issue_date', ''),
-                'expiry_date': data.get('expiry_date', ''),
+            'data': validation_result['data'],  # Return validated/cleaned data
+            'validation': {
+                'errors': validation_result['errors'],
+                'warnings': validation_result['warnings'],
+                'total_errors': validation_result['total_errors'],
+                'total_warnings': validation_result['total_warnings']
             },
             'confidence': data.get('confidence', 0.0),
             'method': self.extraction_method or 'none'
