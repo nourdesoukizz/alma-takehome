@@ -12,8 +12,8 @@ opencv-python-headless==4.8.1.78
 passporteye==2.2.1
 numpy==1.24.3
 
-# AI/LLM Integration (Phase 4)
-openai==1.6.1
+# AI/Vision Integration (Phase 4)
+google-generativeai==0.3.2
 
 # Testing
 pytest==7.4.3

@@ -10,8 +10,10 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
-from extractors.passport_extractor import PassportExtractor
-from extractors.g28_extractor import G28Extractor
+# Use Gemini-based extractors for better accuracy
+from extractors.passport_extractor_gemini import PassportExtractorGemini as PassportExtractor
+from extractors.g28_extractor_gemini import G28ExtractorGemini as G28Extractor
+print("[API] Using Gemini Vision for document extraction")
 from automation.form_filler import fill_form_with_data
 
 # Configure logging
