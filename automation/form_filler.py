@@ -19,31 +19,34 @@ class FormFiller:
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
         
-    async def initialize(self, headless: bool = True):
-        """Initialize Playwright browser"""
+    async def initialize(self, headless: bool = False):
+        """Initialize Playwright browser
+        
+        Args:
+            headless: If False (default for local), shows the browser window
+        """
         try:
-            logger.info("Initializing Playwright browser...")
+            logger.info(f"Initializing Playwright browser (headless={headless})...")
             self.playwright = await async_playwright().start()
             
-            # Launch browser with specific args for Docker compatibility
-            self.browser = await self.playwright.chromium.launch(
-                headless=headless,
-                args=[
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-web-security',
-                    '--disable-features=IsolateOrigins',
-                    '--disable-site-isolation-trials'
-                ],
-                # Additional Docker-specific options
-                handle_sigint=False,
-                handle_sigterm=False,
-                handle_sighup=False
-            )
+            # Check if running locally
+            import os
+            is_local = os.environ.get("ENVIRONMENT") == "local"
+            
+            if is_local and not headless:
+                # Local mode - simple browser launch with visible window
+                logger.info("Launching visible browser for local development...")
+                self.browser = await self.playwright.chromium.launch(
+                    headless=False,
+                    args=['--start-maximized'],
+                    slow_mo=100  # Slow down actions so you can see them
+                )
+            else:
+                # Headless mode (for testing or if explicitly requested)
+                self.browser = await self.playwright.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox']
+                )
             
             # Create new page
             self.page = await self.browser.new_page()
@@ -51,29 +54,14 @@ class FormFiller:
             # Set viewport for consistent rendering
             await self.page.set_viewport_size({"width": 1280, "height": 800})
             
-            logger.info("Browser initialized successfully")
+            logger.info(f"Browser initialized successfully (visible={not headless})")
             return True
             
         except Exception as e:
             logger.error(f"Failed to initialize browser: {str(e)}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            
-            # Try alternative approach for Docker environments
-            logger.info("Attempting fallback browser initialization...")
-            try:
-                # Try without some problematic flags
-                self.browser = await self.playwright.chromium.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-setuid-sandbox']
-                )
-                self.page = await self.browser.new_page()
-                await self.page.set_viewport_size({"width": 1280, "height": 800})
-                logger.info("Fallback browser initialization successful")
-                return True
-            except Exception as fallback_error:
-                logger.error(f"Fallback also failed: {str(fallback_error)}")
-                return False
+            return False
     
     async def navigate_to_form(self) -> bool:
         """Navigate to the form URL"""
@@ -379,32 +367,53 @@ class FormFiller:
         except Exception as e:
             errors.append(f"Error filling radio fields: {str(e)}")
     
-    async def cleanup(self):
-        """Clean up browser resources"""
+    async def cleanup(self, keep_open: bool = False):
+        """Clean up browser resources
+        
+        Args:
+            keep_open: If True, keeps the browser open (useful for local development)
+        """
         try:
-            if self.page:
-                await self.page.close()
-            if self.browser:
-                await self.browser.close()
-            if hasattr(self, 'playwright'):
-                await self.playwright.stop()
-            logger.info("Browser cleanup completed")
+            import os
+            is_local = os.environ.get("ENVIRONMENT") == "local"
+            
+            if is_local and keep_open:
+                logger.info("Keeping browser open for inspection (close manually when done)")
+                # Just stop playwright, but keep browser open
+                if hasattr(self, 'playwright'):
+                    # Don't stop playwright or browser stays open
+                    pass
+            else:
+                if self.page:
+                    await self.page.close()
+                if self.browser:
+                    await self.browser.close()
+                if hasattr(self, 'playwright'):
+                    await self.playwright.stop()
+                logger.info("Browser cleanup completed")
         except Exception as e:
             logger.error(f"Error during cleanup: {str(e)}")
 
 
-async def fill_form_with_data(data: Dict, form_url: Optional[str] = None, headless: bool = True) -> Dict:
+async def fill_form_with_data(data: Dict, form_url: Optional[str] = None, headless: bool = None) -> Dict:
     """
     Convenience function to fill form with extracted data
     
     Args:
         data: Combined extraction data from passport and G-28
         form_url: Optional custom form URL
-        headless: Whether to run browser in headless mode
+        headless: Whether to run browser in headless mode (None = auto-detect based on environment)
         
     Returns:
         Dict with filling results
     """
+    import os
+    
+    # Auto-detect headless mode based on environment
+    if headless is None:
+        is_local = os.environ.get("ENVIRONMENT") == "local"
+        headless = not is_local  # Local = visible, others = headless
+    
     filler = FormFiller(form_url) if form_url else FormFiller()
     
     try:
@@ -425,8 +434,14 @@ async def fill_form_with_data(data: Dict, form_url: Optional[str] = None, headle
         # Fill the form
         result = await filler.fill_form(data)
         
+        # Add note about browser visibility
+        if not headless:
+            result['browser_visible'] = True
+            result['note'] = "Form filled in visible browser - you can interact with it"
+        
         return result
         
     finally:
-        # Always cleanup
-        await filler.cleanup()
+        # Keep browser open in local mode
+        is_local = os.environ.get("ENVIRONMENT") == "local"
+        await filler.cleanup(keep_open=is_local and not headless)

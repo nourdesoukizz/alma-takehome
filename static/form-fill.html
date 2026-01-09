@@ -390,8 +390,16 @@
             document.getElementById('fillStep').classList.add('completed');
             
             // Display result message
-            const message = `Successfully filled ${result.filled_count || 0} fields in the form.`;
-            document.getElementById('resultMessage').textContent = message;
+            let message = `Successfully filled ${result.filled_count || 0} fields in the form.`;
+            
+            // Check if browser is visible (local mode)
+            if (result.browser_visible) {
+                message = '🖥️ Form opened in a new browser window!\n\n';
+                message += `✅ Successfully filled ${result.filled_count || 0} fields\n`;
+                message += '👉 You can now interact with the form, review the data, and submit it manually.';
+            }
+            
+            document.getElementById('resultMessage').innerHTML = message.replace(/\n/g, '<br>');
             
             // Display filled fields
             const fieldsList = document.getElementById('filledFieldsList');

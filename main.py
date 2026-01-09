@@ -480,10 +480,11 @@ async def fill_form(session_id: str):
         }
         
         # Fill the form using Playwright
+        # Auto-detects environment - visible browser for local, headless for production
         import asyncio
         result = await fill_form_with_data(
             data=combined_data,
-            headless=True  # Run in headless mode in Docker
+            headless=None  # Auto-detect based on environment
         )
         
         # If screenshot was taken, save it to session directory
