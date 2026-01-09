@@ -19,6 +19,9 @@ openai==1.6.1
 pytest==7.4.3
 httpx==0.25.2
 
+# Browser Automation (Phase 5)
+playwright==1.40.0
+
 # Utilities
 python-dotenv==1.0.0
 pydantic==2.5.2

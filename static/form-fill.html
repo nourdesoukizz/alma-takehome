@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Filling - Alma Immigration</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .form-fill-container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        
+        .progress-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e0e0e0;
+            z-index: -1;
+        }
+        
+        .step {
+            background: white;
+            padding: 0.5rem;
+            text-align: center;
+            flex: 1;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+            font-weight: bold;
+        }
+        
+        .step.completed .step-number {
+            background: #4A7C7E;
+            color: white;
+        }
+        
+        .step.active .step-number {
+            background: #FFA500;
+            color: white;
+        }
+        
+        .step-title {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .extraction-summary {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .data-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .data-section h3 {
+            color: #4A7C7E;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .data-item {
+            background: white;
+            padding: 0.75rem;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .data-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        
+        .data-value {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .form-fill-status {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .status-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .btn-fill-form {
+            background: #4A7C7E;
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        
+        .btn-fill-form:hover {
+            background: #3a6c6e;
+        }
+        
+        .btn-secondary {
+            background: #666;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 0.5rem;
+        }
+        
+        .result-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f0f7f7;
+            border-radius: 8px;
+            border: 1px solid #4A7C7E;
+        }
+        
+        .filled-fields {
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+        
+        .field-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .field-item:last-child {
+            border-bottom: none;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">Alma</h1>
+            <p class="tagline">Immigration Document Processing</p>
+        </header>
+        
+        <main class="form-fill-container">
+            <!-- Progress Steps -->
+            <div class="progress-steps">
+                <div class="step completed">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Upload Documents</div>
+                </div>
+                <div class="step completed">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Extract Data</div>
+                </div>
+                <div class="step active" id="fillStep">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Fill Form</div>
+                </div>
+            </div>
+            
+            <!-- Extraction Summary -->
+            <div class="extraction-summary" id="extractionSummary">
+                <h2>Extracted Document Data</h2>
+                
+                <!-- Passport Data -->
+                <div class="data-section" id="passportSection">
+                    <h3>📘 Passport Information</h3>
+                    <div class="data-grid" id="passportData">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- G-28 Data -->
+                <div class="data-section" id="g28Section">
+                    <h3>📋 G-28 Attorney Information</h3>
+                    <div class="data-grid" id="g28Data">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Form Fill Action -->
+            <div class="form-fill-status" id="formFillStatus">
+                <p>Review the extracted data above. When ready, click the button to automatically fill the immigration form.</p>
+                <button class="btn-fill-form" onclick="fillForm()">
+                    Fill Immigration Form
+                </button>
+                <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">
+                    The form will be filled but not submitted
+                </p>
+            </div>
+            
+            <!-- Loading State -->
+            <div id="fillingState" style="display: none;" class="form-fill-status">
+                <div class="spinner"></div>
+                <h3>Filling the form...</h3>
+                <p>Please wait while we populate the form fields</p>
+            </div>
+            
+            <!-- Result Section -->
+            <div id="resultSection" class="result-section" style="display: none;">
+                <h3>✅ Form Filling Complete!</h3>
+                <p id="resultMessage"></p>
+                <div id="filledFieldsList" class="filled-fields"></div>
+                <div style="text-align: center; margin-top: 1.5rem;">
+                    <button class="btn-secondary" onclick="viewForm()">View Filled Form</button>
+                    <button class="btn-secondary" onclick="startOver()">Start Over</button>
+                </div>
+            </div>
+            
+            <!-- Error Section -->
+            <div id="errorSection" class="error-message" style="display: none;">
+                <h3>❌ Form Filling Failed</h3>
+                <p id="errorMessage"></p>
+                <button class="btn-secondary" onclick="retryFilling()">Retry</button>
+            </div>
+        </main>
+        
+        <footer class="footer">
+            <p>© 2024 Alma. Immigration made simple.</p>
+        </footer>
+    </div>
+    
+    <script>
+        // Get session data
+        const sessionData = JSON.parse(localStorage.getItem('extractionData') || '{}');
+        
+        // Display extracted data on page load
+        window.onload = function() {
+            displayExtractedData();
+        };
+        
+        function displayExtractedData() {
+            // Display passport data
+            const passportData = sessionData.passport || {};
+            const passportGrid = document.getElementById('passportData');
+            
+            if (Object.keys(passportData).length > 0) {
+                passportGrid.innerHTML = '';
+                const fields = [
+                    { label: 'Full Name', value: passportData.full_name },
+                    { label: 'Passport Number', value: passportData.passport_number },
+                    { label: 'Nationality', value: passportData.nationality },
+                    { label: 'Date of Birth', value: passportData.date_of_birth },
+                    { label: 'Gender', value: passportData.sex },
+                    { label: 'Expiry Date', value: passportData.expiry_date }
+                ];
+                
+                fields.forEach(field => {
+                    if (field.value) {
+                        passportGrid.innerHTML += `
+                            <div class="data-item">
+                                <div class="data-label">${field.label}</div>
+                                <div class="data-value">${field.value}</div>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                passportGrid.innerHTML = '<p style="color: #999;">No passport data extracted</p>';
+            }
+            
+            // Display G-28 data
+            const g28Data = sessionData.g28 || {};
+            const g28Grid = document.getElementById('g28Data');
+            
+            if (Object.keys(g28Data).length > 0) {
+                g28Grid.innerHTML = '';
+                const attorneyName = g28Data.attorney_name || {};
+                const address = g28Data.address || {};
+                const contact = g28Data.contact || {};
+                
+                const fields = [
+                    { label: 'Attorney Name', value: `${attorneyName.first || ''} ${attorneyName.last || ''}`.trim() },
+                    { label: 'Firm Name', value: g28Data.firm_name },
+                    { label: 'Street Address', value: address.street },
+                    { label: 'City', value: address.city },
+                    { label: 'State', value: address.state },
+                    { label: 'ZIP Code', value: address.zip },
+                    { label: 'Phone', value: contact.phone },
+                    { label: 'Email', value: contact.email }
+                ];
+                
+                fields.forEach(field => {
+                    if (field.value) {
+                        g28Grid.innerHTML += `
+                            <div class="data-item">
+                                <div class="data-label">${field.label}</div>
+                                <div class="data-value">${field.value}</div>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                g28Grid.innerHTML = '<p style="color: #999;">No G-28 data extracted</p>';
+            }
+        }
+        
+        async function fillForm() {
+            const sessionId = sessionData.sessionId;
+            if (!sessionId) {
+                alert('No session data found. Please start over.');
+                return;
+            }
+            
+            // Show loading state
+            document.getElementById('formFillStatus').style.display = 'none';
+            document.getElementById('fillingState').style.display = 'block';
+            document.getElementById('errorSection').style.display = 'none';
+            
+            try {
+                const response = await fetch(`/api/fill-form/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(result);
+                    
+                    // Update view form button to show screenshot
+                    if (result.screenshot_url) {
+                        const viewBtn = document.querySelector('#resultSection button[onclick="viewForm()"]');
+                        if (viewBtn) {
+                            viewBtn.textContent = 'View Filled Form Screenshot';
+                            viewBtn.classList.add('btn-primary');
+                            viewBtn.classList.remove('btn-secondary');
+                        }
+                    }
+                } else {
+                    showError(result.error || 'Form filling failed');
+                }
+                
+            } catch (error) {
+                console.error('Form filling error:', error);
+                showError('Failed to connect to form filling service');
+            }
+        }
+        
+        function showSuccess(result) {
+            document.getElementById('fillingState').style.display = 'none';
+            document.getElementById('resultSection').style.display = 'block';
+            document.getElementById('fillStep').classList.add('completed');
+            
+            // Display result message
+            const message = `Successfully filled ${result.filled_count || 0} fields in the form.`;
+            document.getElementById('resultMessage').textContent = message;
+            
+            // Display filled fields
+            const fieldsList = document.getElementById('filledFieldsList');
+            if (result.filled_fields && result.filled_fields.length > 0) {
+                fieldsList.innerHTML = '<h4>Filled Fields:</h4>';
+                result.filled_fields.forEach(field => {
+                    fieldsList.innerHTML += `
+                        <div class="field-item">
+                            <strong>${field.field}:</strong> ${field.value}
+                        </div>
+                    `;
+                });
+            }
+        }
+        
+        function showError(message) {
+            document.getElementById('fillingState').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+        
+        async function viewForm() {
+            const sessionData = JSON.parse(localStorage.getItem('uploadSession') || '{}');
+            const sessionId = sessionData.sessionId;
+            
+            if (!sessionId) {
+                alert('Session not found. Please start over.');
+                return;
+            }
+            
+            try {
+                // Get the form preview with pre-filled URL
+                const response = await fetch(`/api/form-preview/${sessionId}`);
+                const result = await response.json();
+                
+                if (result.success && result.screenshot_url) {
+                    // Show screenshot in a modal or new tab
+                    showScreenshotModal(result.screenshot_url);
+                } else if (result.filled_url) {
+                    // Open the form with query parameters (though the external form may not support this)
+                    window.open(result.filled_url, '_blank');
+                }
+            } catch (error) {
+                console.error('Error viewing form:', error);
+                // Fallback to just opening the form
+                window.open('https://mendrika-alma.github.io/form-submission/', '_blank');
+            }
+        }
+        
+        function showScreenshotModal(screenshotUrl) {
+            // Create a modal to show the screenshot
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                cursor: pointer;
+            `;
+            
+            const img = document.createElement('img');
+            img.src = screenshotUrl;
+            img.style.cssText = `
+                max-width: 90%;
+                max-height: 90%;
+                border: 2px solid white;
+                box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            `;
+            
+            const closeBtn = document.createElement('div');
+            closeBtn.innerHTML = '✕';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 20px;
+                right: 30px;
+                color: white;
+                font-size: 40px;
+                cursor: pointer;
+                background: rgba(0,0,0,0.5);
+                width: 50px;
+                height: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+            `;
+            
+            modal.appendChild(img);
+            modal.appendChild(closeBtn);
+            
+            modal.onclick = () => document.body.removeChild(modal);
+            closeBtn.onclick = () => document.body.removeChild(modal);
+            
+            document.body.appendChild(modal);
+        }
+        
+        function startOver() {
+            localStorage.removeItem('extractionData');
+            localStorage.removeItem('uploadSession');
+            window.location.href = '/';
+        }
+        
+        function retryFilling() {
+            fillForm();
+        }
+    </script>
+</body>
+</html>

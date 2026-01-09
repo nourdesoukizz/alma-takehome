@@ -6,11 +6,19 @@ import os
 import uuid
 import shutil
 import re
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
 from extractors.passport_extractor import PassportExtractor
 from extractors.g28_extractor import G28Extractor
+from automation.form_filler import fill_form_with_data
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Load environment variables
 load_dotenv()
@@ -325,6 +333,179 @@ async def get_g28_extraction(session_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get G-28 extraction: {str(e)}")
+
+@app.get("/api/screenshot/{session_id}")
+async def get_form_screenshot(session_id: str):
+    """Get the screenshot of the filled form"""
+    try:
+        screenshot_path = UPLOADS_DIR / session_id / "filled_form.png"
+        
+        if not screenshot_path.exists():
+            # Try the root directory too
+            screenshot_path = Path("filled_form.png")
+            if not screenshot_path.exists():
+                raise HTTPException(status_code=404, detail="Screenshot not found")
+        
+        return FileResponse(
+            screenshot_path,
+            media_type="image/png",
+            headers={"Content-Disposition": "inline; filename=filled_form.png"}
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get screenshot: {str(e)}")
+
+@app.get("/api/form-preview/{session_id}")
+async def get_form_preview(session_id: str):
+    """Generate an HTML preview of the filled form data"""
+    try:
+        session_dir = UPLOADS_DIR / session_id
+        if not session_dir.exists():
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Get the filled data
+        passport_data = {}
+        g28_data = {}
+        
+        # Extract passport data
+        passport_files = list(session_dir.glob("passport.*"))
+        if passport_files:
+            extractor = PassportExtractor()
+            result = extractor.extract(str(passport_files[0]))
+            if result.get('success'):
+                passport_data = result.get('data', {})
+        
+        # Extract G-28 data
+        g28_files = list(session_dir.glob("g28.*"))
+        if g28_files:
+            extractor = G28Extractor()
+            result = extractor.extract(str(g28_files[0]))
+            if result.get('success'):
+                g28_data = result.get('data', {})
+        
+        # Generate form URL with pre-filled data as query parameters
+        from urllib.parse import urlencode
+        
+        form_params = {}
+        
+        # Map passport data to form fields
+        if passport_data:
+            form_params['given-name'] = passport_data.get('first_name', '')
+            form_params['family-name'] = passport_data.get('last_name', '')
+            full_name = passport_data.get('full_name', '')
+            if full_name:
+                parts = full_name.split()
+                if len(parts) == 3:
+                    form_params['middle-name'] = parts[1]
+            form_params['passport-number'] = passport_data.get('passport_number', '')
+            form_params['country'] = passport_data.get('country_code', '') or passport_data.get('nationality', '')
+        
+        # Map G-28 data to form fields
+        if g28_data:
+            address = g28_data.get('address', {})
+            street = address.get('street', '')
+            if street:
+                parts = street.split(None, 1)
+                if parts and parts[0].replace('-', '').isdigit():
+                    form_params['street-number'] = parts[0]
+            
+            form_params['city'] = address.get('city', '')
+            form_params['state'] = address.get('state', '')
+            form_params['zip'] = address.get('zip', '')
+            
+            contact = g28_data.get('contact', {})
+            form_params['daytime-phone'] = contact.get('phone', '')
+            form_params['mobile-phone'] = contact.get('mobile', '')
+            form_params['email'] = contact.get('email', '')
+            
+            eligibility = g28_data.get('eligibility', {})
+            form_params['bar-number'] = eligibility.get('bar_number', '')
+            form_params['online-account'] = eligibility.get('uscis_account', '')
+        
+        # Remove empty values
+        form_params = {k: v for k, v in form_params.items() if v}
+        
+        # Create the pre-filled form URL
+        base_url = "https://mendrika-alma.github.io/form-submission/"
+        if form_params:
+            filled_url = f"{base_url}?{urlencode(form_params)}"
+        else:
+            filled_url = base_url
+        
+        return JSONResponse(content={
+            "success": True,
+            "filled_url": filled_url,
+            "form_data": form_params,
+            "screenshot_url": f"/api/screenshot/{session_id}"
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
+
+@app.post("/api/fill-form/{session_id}")
+async def fill_form(session_id: str):
+    """Fill form with extracted passport and G-28 data"""
+    try:
+        # Validate session exists
+        session_dir = UPLOADS_DIR / session_id
+        if not session_dir.exists():
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Get extracted passport data
+        passport_data = {}
+        passport_files = list(session_dir.glob("passport.*"))
+        if passport_files:
+            extractor = PassportExtractor()
+            passport_result = extractor.extract(str(passport_files[0]))
+            if passport_result.get('success'):
+                passport_data = passport_result.get('data', {})
+        
+        # Get extracted G-28 data
+        g28_data = {}
+        g28_files = list(session_dir.glob("g28.*"))
+        if g28_files:
+            extractor = G28Extractor()
+            g28_result = extractor.extract(str(g28_files[0]))
+            if g28_result.get('success'):
+                g28_data = g28_result.get('data', {})
+        
+        # Combine data for form filling
+        combined_data = {
+            "passport": passport_data,
+            "g28": g28_data
+        }
+        
+        # Fill the form using Playwright
+        import asyncio
+        result = await fill_form_with_data(
+            data=combined_data,
+            headless=True  # Run in headless mode in Docker
+        )
+        
+        # If screenshot was taken, save it to session directory
+        if result.get('screenshot'):
+            screenshot_src = Path(result['screenshot'])
+            if screenshot_src.exists():
+                screenshot_dest = session_dir / "filled_form.png"
+                shutil.copy(str(screenshot_src), str(screenshot_dest))
+                result['screenshot_url'] = f"/api/screenshot/{session_id}"
+        
+        # Add session info to result
+        result['sessionId'] = session_id
+        result['data_used'] = combined_data
+        
+        return JSONResponse(content=result)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Form filling failed: {str(e)}")
 
 # Mount static files (this should be last)
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

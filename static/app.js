@@ -642,6 +642,42 @@ async function proceedToG28Extraction() {
 // Make function globally available
 window.proceedToG28Extraction = proceedToG28Extraction;
 
+// Proceed to form filling
+async function proceedToFormFilling() {
+    console.log('Proceeding to form filling...');
+    
+    try {
+        // Get session data
+        const sessionData = JSON.parse(localStorage.getItem('uploadSession') || '{}');
+        
+        // Get passport extraction data
+        const passportResponse = await fetch(`/api/extract/passport/${sessionData.sessionId}`);
+        const passportResult = await passportResponse.json();
+        
+        // Get G-28 extraction data
+        const g28Response = await fetch(`/api/extract/g28/${sessionData.sessionId}`);
+        const g28Result = await g28Response.json();
+        
+        // Store extraction data for form filling page
+        const extractionData = {
+            sessionId: sessionData.sessionId,
+            passport: passportResult.data || {},
+            g28: g28Result.data || {}
+        };
+        
+        localStorage.setItem('extractionData', JSON.stringify(extractionData));
+        
+        // Navigate to form filling page
+        window.location.href = '/form-fill.html';
+        
+    } catch (error) {
+        console.error('Error proceeding to form filling:', error);
+        showError('Failed to proceed to form filling. Please try again.');
+    }
+}
+
+window.proceedToFormFilling = proceedToFormFilling;
+
 // Display G-28 extraction results
 function displayG28Results(result) {
     const extractionHTML = `
@@ -915,11 +951,8 @@ function displayG28Results(result) {
     document.querySelector('.main-content').innerHTML = extractionHTML;
 }
 
-// Proceed to form filling (Phase 5)
-function proceedToFormFilling() {
-    console.log('Form filling will be implemented in Phase 5');
-    alert('Form filling will be implemented in Phase 5. Both passport and G-28 data have been extracted successfully.');
-}
+// Proceed to form filling - this function was moved earlier in the file
+// The actual implementation is around line 646-679
 
 // Utility Functions
 function formatFileSize(bytes) {
