@@ -138,10 +138,10 @@ class FormFiller:
             await self.page.goto(self.form_url, wait_until="domcontentloaded", timeout=60000)
             
             # Wait for form container to be ready (the page uses div.form-container, not form tag)
-            await self.page.wait_for_selector('.form-container', timeout=30000)
+            await self.page.wait_for_selector('.form-container', state='visible', timeout=30000)
             
-            # Additional wait for any dynamic content
-            await self.page.wait_for_timeout(2000)
+            # Wait for at least one form input to be ready (better than arbitrary wait)
+            await self.page.wait_for_selector('input, select', state='visible', timeout=10000)
             
             logger.info("Successfully navigated to form")
             return True
@@ -152,8 +152,10 @@ class FormFiller:
             # Try with alternative wait strategy
             try:
                 logger.info("Attempting alternative navigation strategy...")
-                await self.page.goto(self.form_url, wait_until="load", timeout=60000)
-                await self.page.wait_for_timeout(5000)  # Wait for JS to load
+                await self.page.goto(self.form_url, wait_until="networkidle", timeout=60000)
+                
+                # Wait for form container to be visible and interactive
+                await self.page.wait_for_selector('.form-container', state='visible', timeout=10000)
                 
                 # Check if form container exists
                 form_container = await self.page.query_selector('.form-container')
@@ -231,6 +233,8 @@ class FormFiller:
                                 # Check if element exists
                                 element = await self.page.query_selector(selector)
                                 if element:
+                                    # Wait for element to be ready before filling
+                                    await element.wait_for_element_state('visible', timeout=5000)
                                     # Clear existing value
                                     await self.page.fill(selector, "")
                                     # Fill with new value
@@ -496,6 +500,8 @@ class FormFiller:
                     
                     if value:
                         try:
+                            # Ensure select is ready before interacting
+                            await select.wait_for_element_state('visible', timeout=2000)
                             await select.select_option(value=value, timeout=5000)
                             filled_fields.append({
                                 "field": select_id,
@@ -540,6 +546,7 @@ class FormFiller:
                         if self.page and not self.page.is_closed():
                             radio = await self.page.query_selector(selector)
                             if radio:
+                                await radio.wait_for_element_state('visible', timeout=2000)
                                 await radio.click(timeout=5000)
                                 filled_fields.append({
                                     "field": "gender_radio",
